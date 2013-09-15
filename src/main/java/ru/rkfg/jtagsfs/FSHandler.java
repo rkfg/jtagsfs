@@ -27,7 +27,7 @@ public interface FSHandler {
 
     void truncate(Filepath filepath, long offset) throws FSHandlerException;
 
-    public void create(Filepath filepath) throws FSHandlerException;
+    public void create(Filepath filepath, FileInfoWrapper info) throws FSHandlerException;
 
     public int write(Filepath filepath, ByteBuffer buffer, long bufSize, long writeOffset) throws FSHandlerException;
 

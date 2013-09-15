@@ -45,7 +45,7 @@ public abstract class UnsupportedFSHandler implements FSHandler {
     }
 
     @Override
-    public void create(Filepath filepath) throws FSHandlerException {
+    public void create(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
         throw new FSHandlerException("notsupp");
     }
 

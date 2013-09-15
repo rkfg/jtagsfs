@@ -44,17 +44,13 @@ public class TagsHandler extends UnsupportedFSHandler {
             return --lockCount;
         }
 
-        public void setStream(T stream) {
-            this.stream = stream;
-        }
-
     }
 
     private HashMap<String, LockableStream<FileOutputStream>> writeStreamCache = new HashMap<String, LockableStream<FileOutputStream>>();
     private HashMap<String, LockableStream<FileInputStream>> readStreamCache = new HashMap<String, LockableStream<FileInputStream>>();
 
     @Override
-    public void create(final Filepath filepath) throws FSHandlerException {
+    public void create(final Filepath filepath, final FileInfoWrapper info) throws FSHandlerException {
         HibernateUtil.exec(new HibernateCallback<Void>() {
 
             public Void run(Session session) {
@@ -63,6 +59,7 @@ public class TagsHandler extends UnsupportedFSHandler {
                 return null;
             }
         });
+        open(filepath, info);
     }
 
     @Override

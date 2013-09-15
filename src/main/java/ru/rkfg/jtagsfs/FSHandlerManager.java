@@ -352,10 +352,10 @@ public class FSHandlerManager {
         handler.truncate(strip(filepath, handler), offset);
     }
 
-    public void create(String path) throws FSHandlerException {
+    public void create(String path, FileInfoWrapper info) throws FSHandlerException {
         Filepath filepath = parseFilePath(path);
         FSHandler handler = getHandlerByPath(filepath);
-        handler.create(strip(filepath, handler));
+        handler.create(strip(filepath, handler), info);
     }
 
     public int write(String path, ByteBuffer buffer, long bufSize, long writeOffset, FileInfoWrapper wrapper) {

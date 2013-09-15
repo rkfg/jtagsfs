@@ -45,7 +45,7 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
     @Override
     public int create(String path, ModeWrapper mode, FileInfoWrapper info) {
         try {
-            manager.create(path);
+            manager.create(path, info);
             return 0;
         } catch (FSHandlerException e) {
             return -ErrorCodes.ENOTSUP();
