@@ -22,11 +22,7 @@ public class ControlHandler extends UnsupportedFSHandler {
 
     @Override
     public List<String> readdir(Filepath filepath) {
-        String parent = filepath.getPathLast();
-        if (parent.isEmpty()) {
-            parent = null;
-        }
-        return FSHandlerManager.getTags(new String[0], parent, true);
+        return FSHandlerManager.getTags(filepath.getPath(), true);
     }
 
     @Override

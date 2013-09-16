@@ -160,7 +160,7 @@ public class TagsHandler extends UnsupportedFSHandler {
             if (filepath.getPathLength() == 0) {
                 tags = FSHandlerManager.getTags(filepath.getPath());
             } else {
-                tags = FSHandlerManager.getTags(filepath.getPath(), filepath.getPathLast(), false);
+                tags = FSHandlerManager.getTags(filepath.getPath(), false);
             }
             tags.add(Consts.ENDOFTAGS);
             return tags;

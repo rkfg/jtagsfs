@@ -85,10 +85,10 @@ public class FSHandlerManager {
     }
 
     public static List<String> getTags(final String[] exclude) {
-        return getTags(exclude, null, true);
+        return getTags(exclude, true);
     }
 
-    public static List<String> getTags(final String[] exclude, final String parent, final boolean strict) {
+    public static List<String> getTags(final String[] exclude, final boolean strict) {
         return HibernateUtil.exec(new HibernateCallback<List<String>>() {
 
             @SuppressWarnings("unchecked")
@@ -101,16 +101,16 @@ public class FSHandlerManager {
                     query += " and t.name not in (:exc)";
                     params.put("exc", exclude);
                 }
-                if (parent == null) {
-                    query += " and t.parent is null";
-                } else {
-                    if (strict) {
+                if (strict) {
+                    if (exclude.length > 0) {
                         query += " and t.parent.name = :p";
-                        params.put("p", parent);
+                        params.put("p", exclude[exclude.length - 1]);
                     } else {
-                        query += " and ((t.parent is not null and p.name = :p) or t.parent is null)";
-                        params.put("p", parent);
+                        query += " and t.parent is null";
                     }
+                } else {
+                    query += " and ((t.parent is not null and p.name in (:p)) or t.parent is null)";
+                    params.put("p", exclude);
                 }
                 tags = session.createQuery(query).setProperties(params).list();
                 for (Tag tag : tags) {
