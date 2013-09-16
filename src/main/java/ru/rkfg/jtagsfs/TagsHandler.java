@@ -187,7 +187,8 @@ public class TagsHandler extends UnsupportedFSHandler {
                 return null;
             }
         });
-
+        FSHandlerManager.removeFileFromCache(from);
+        FSHandlerManager.removeFileFromCache(to);
     }
 
     @Override
@@ -217,7 +218,7 @@ public class TagsHandler extends UnsupportedFSHandler {
                 return null;
             }
         });
-
+        FSHandlerManager.removeFileFromCache(filepath);
     }
 
     @Override
@@ -274,6 +275,7 @@ public class TagsHandler extends UnsupportedFSHandler {
             }
 
         }
+        FSHandlerManager.removeFileFromCache(filepath);
     }
 
 }

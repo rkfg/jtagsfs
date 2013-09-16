@@ -22,6 +22,8 @@ import ru.rkfg.jtagsfs.domain.Tag;
 
 public class FSHandlerManager {
 
+    private static HashMap<String, File> fileCache = new HashMap<String, File>();
+
     public static class FSHandlerException extends Exception {
 
         /**
@@ -161,8 +163,29 @@ public class FSHandlerManager {
     }
 
     public static File openFileByFilepath(Filepath filepath) {
-        FileRecord fileRecord = getFileRecordByFilepath(filepath);
-        return openFileByNameId(fileRecord.getName(), fileRecord.getId());
+        File result = getFileFromCache(filepath);
+        if (result == null) {
+            FileRecord fileRecord = getFileRecordByFilepath(filepath);
+            result = openFileByNameId(fileRecord.getName(), fileRecord.getId());
+            storeFileToCache(filepath, result);
+        }
+        return result;
+    }
+
+    private static File getFileFromCache(Filepath filepath) {
+        return fileCache.get(filepath.asStringPath());
+    }
+
+    private static void storeFileToCache(Filepath filepath, File file) {
+        synchronized (fileCache) {
+            fileCache.put(filepath.asStringPath(), file);
+        }
+    }
+
+    public static void removeFileFromCache(Filepath filepath) {
+        synchronized (fileCache) {
+            fileCache.remove(filepath.asStringPath());
+        }
     }
 
     public static File openFileByNameId(String name, Long id) {
