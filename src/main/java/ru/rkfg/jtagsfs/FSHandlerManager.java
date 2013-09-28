@@ -22,8 +22,6 @@ import ru.rkfg.jtagsfs.domain.Tag;
 
 public class FSHandlerManager {
 
-    private static HashMap<String, File> fileCache = new HashMap<String, File>();
-
     public static class FSHandlerException extends Exception {
 
         /**
@@ -59,9 +57,13 @@ public class FSHandlerManager {
         try {
             StringBuilder queryTags = new StringBuilder();
             for (String tag : filepath.getPath()) {
-                queryTags.append(" and '").append(tag).append("' in (select t.name from Tag t where t in elements(f.tags))");
+                if (tag.equals(CONCATTAGS)) {
+                    queryTags.append(" or 1=1");
+                } else {
+                    queryTags.append(" and '").append(tag).append("' in (select t.name from Tag t where t in elements(f.tags))");
+                }
             }
-            FileRecord fileRecord = (FileRecord) session.createQuery("from FileRecord f where f.name = :name " + queryTags)
+            FileRecord fileRecord = (FileRecord) session.createQuery("from FileRecord f where f.name = :name and (1=1" + queryTags + ")")
                     .setString("name", name).uniqueResult();
             if (fileRecord != null) {
                 return fileRecord;
@@ -131,9 +133,16 @@ public class FSHandlerManager {
                 int n = 0;
                 HashMap<String, Object> params = new HashMap<String, Object>();
                 for (String tag : pathParts) {
-                    where.append(" and :tag" + n + " in elements(f.tags)");
-                    params.put("tag" + n, session.createQuery("from Tag t where t.name = :tag").setString("tag", tag).uniqueResult());
-                    n++;
+                    if (tag.equals(CONCATTAGS)) {
+                        where.append(" or 1=1");
+                    } else {
+                        Tag tagEntity = (Tag) session.createQuery("from Tag t where t.name = :tag").setString("tag", tag).uniqueResult();
+                        if (tagEntity != null) {
+                            where.append(" and :tag" + n + " in elements(f.tags)");
+                            params.put("tag" + n, tagEntity);
+                        }
+                        n++;
+                    }
                 }
                 @SuppressWarnings("unchecked")
                 List<FileRecord> fileRecords = session
@@ -163,29 +172,8 @@ public class FSHandlerManager {
     }
 
     public static File openFileByFilepath(Filepath filepath) {
-        File result = getFileFromCache(filepath);
-        if (result == null) {
-            FileRecord fileRecord = getFileRecordByFilepath(filepath);
-            result = openFileByNameId(fileRecord.getName(), fileRecord.getId());
-            storeFileToCache(filepath, result);
-        }
-        return result;
-    }
-
-    private static File getFileFromCache(Filepath filepath) {
-        return fileCache.get(filepath.asStringPath());
-    }
-
-    private static void storeFileToCache(Filepath filepath, File file) {
-        synchronized (fileCache) {
-            fileCache.put(filepath.asStringPath(), file);
-        }
-    }
-
-    public static void removeFileFromCache(Filepath filepath) {
-        synchronized (fileCache) {
-            fileCache.remove(filepath.asStringPath());
-        }
+        FileRecord fileRecord = getFileRecordByFilepath(filepath);
+        return openFileByNameId(fileRecord.getName(), fileRecord.getId());
     }
 
     public static File openFileByNameId(String name, Long id) {

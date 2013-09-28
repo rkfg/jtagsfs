@@ -84,7 +84,7 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
         try {
             manager.readdir(path, filler);
         } catch (FSHandlerException e) {
-            return -ErrorCodes.ENOTSUP();
+            return -ErrorCodes.ENOENT();
         }
         return 0;
     }

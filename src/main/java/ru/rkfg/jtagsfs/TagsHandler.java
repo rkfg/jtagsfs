@@ -1,18 +1,16 @@
 package ru.rkfg.jtagsfs;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
 import net.fusejna.StructFuseFileInfo.FileInfoWrapper;
-import net.fusejna.StructFuseFileInfo.FileInfoWrapper.OpenMode;
 import net.fusejna.StructStat.StatWrapper;
 
 import org.hibernate.Session;
@@ -23,16 +21,16 @@ import ru.rkfg.jtagsfs.domain.Tag;
 
 public class TagsHandler extends UnsupportedFSHandler {
 
-    private class LockableStream<T> {
+    private class LockableFile {
         int lockCount;
-        T stream;
+        RandomAccessFile stream;
 
-        public LockableStream(T stream) {
+        public LockableFile(RandomAccessFile stream) {
             this.stream = stream;
             lockCount = 1;
         }
 
-        public T getStream() {
+        public RandomAccessFile getFile() {
             return stream;
         }
 
@@ -46,8 +44,7 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     }
 
-    private HashMap<String, LockableStream<FileOutputStream>> writeStreamCache = new HashMap<String, LockableStream<FileOutputStream>>();
-    private HashMap<String, LockableStream<FileInputStream>> readStreamCache = new HashMap<String, LockableStream<FileInputStream>>();
+    private HashMap<String, LockableFile> fileCache = new HashMap<String, LockableFile>();
 
     @Override
     public void create(final Filepath filepath, final FileInfoWrapper info) throws FSHandlerException {
@@ -97,37 +94,17 @@ public class TagsHandler extends UnsupportedFSHandler {
     @Override
     public void open(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
         String strPath = filepath.asStringPath();
-        if (info.openMode() == OpenMode.READONLY || info.openMode() == OpenMode.READWRITE) {
-            LockableStream<FileInputStream> lockable = readStreamCache.get(strPath);
-            if (lockable != null) {
-                lockable.lock();
-            } else {
-                File file = FSHandlerManager.openFileByFilepath(filepath);
-                if (file == null) {
-                    throw new FSHandlerException("notfound");
-                }
-                try {
-                    file.createNewFile();
-                    FileInputStream fileInputStream = new FileInputStream(file);
-                    readStreamCache.put(strPath, new LockableStream<FileInputStream>(fileInputStream));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-        if (info.openMode() == OpenMode.WRITEONLY || info.openMode() == OpenMode.READWRITE) {
-            LockableStream<FileOutputStream> lockable = writeStreamCache.get(strPath);
-            if (lockable != null) {
-                lockable.lock();
-            } else {
-                File file = FSHandlerManager.openFileByFilepath(filepath);
-                try {
-                    file.createNewFile();
-                    FileOutputStream fileOutputStream = new FileOutputStream(file, true);
-                    writeStreamCache.put(strPath, new LockableStream<FileOutputStream>(fileOutputStream));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        LockableFile lockable = fileCache.get(strPath);
+        if (lockable != null) {
+            lockable.lock();
+        } else {
+            File file = FSHandlerManager.openFileByFilepath(filepath);
+            try {
+                file.createNewFile();
+                RandomAccessFile raFile = new RandomAccessFile(file, "rw");
+                fileCache.put(strPath, new LockableFile(raFile));
+            } catch (IOException e) {
+                e.printStackTrace();
             }
         }
     }
@@ -136,13 +113,14 @@ public class TagsHandler extends UnsupportedFSHandler {
     public int read(Filepath filepath, ByteBuffer buffer, long size, long offset) throws FSHandlerException {
         try {
             String strPath = filepath.asStringPath();
-            LockableStream<FileInputStream> lockableStream = readStreamCache.get(strPath);
+            LockableFile lockableStream = fileCache.get(strPath);
             if (lockableStream == null) {
                 throw new FSHandlerException("notopened");
             }
             synchronized (lockableStream) {
-                FileChannel channel = lockableStream.getStream().getChannel();
-                int read = channel.read(buffer, offset);
+                RandomAccessFile file = lockableStream.getFile();
+                file.seek(offset);
+                int read = file.getChannel().read(buffer);
                 if (read < 0) {
                     read = 0;
                 }
@@ -154,18 +132,39 @@ public class TagsHandler extends UnsupportedFSHandler {
     }
 
     @Override
-    public List<String> readdir(Filepath filepath) {
+    public List<String> readdir(Filepath filepath) throws FSHandlerException {
         if (!filepath.isContent()) {
             List<String> tags;
-            if (filepath.getPathLength() == 0) {
-                tags = FSHandlerManager.getTags(filepath.getPath());
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
+                tags = FSHandlerManager.getTags(new String[0]);
             } else {
                 tags = FSHandlerManager.getTags(filepath.getPath(), false);
+                tags.add(Consts.CONCATTAGS);
+                tags.add(Consts.ENDOFTAGS);
             }
-            tags.add(Consts.ENDOFTAGS);
             return tags;
         } else {
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
+                throw new FSHandlerException("Empty tags or rvalue in concat.");
+            }
             return FSHandlerManager.fileRecordsToNames(FSHandlerManager.listFiles(filepath.getPath()));
+        }
+    }
+
+    @Override
+    public void release(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
+        String strPath = filepath.asStringPath();
+        LockableFile lockableFile = fileCache.get(strPath);
+        if (lockableFile == null) {
+            throw new FSHandlerException("notopened");
+        }
+        if (lockableFile.release() == 0) {
+            try {
+                lockableFile.getFile().close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            fileCache.remove(strPath);
         }
     }
 
@@ -187,8 +186,7 @@ public class TagsHandler extends UnsupportedFSHandler {
                 return null;
             }
         });
-        FSHandlerManager.removeFileFromCache(from);
-        FSHandlerManager.removeFileFromCache(to);
+
     }
 
     @Override
@@ -218,20 +216,21 @@ public class TagsHandler extends UnsupportedFSHandler {
                 return null;
             }
         });
-        FSHandlerManager.removeFileFromCache(filepath);
+
     }
 
     @Override
     public int write(Filepath filepath, ByteBuffer buffer, long bufSize, long writeOffset) throws FSHandlerException {
         try {
             String strPath = filepath.asStringPath();
-            LockableStream<FileOutputStream> lockableStream = writeStreamCache.get(strPath);
-            if (lockableStream == null) {
+            LockableFile lockable = fileCache.get(strPath);
+            if (lockable == null) {
                 throw new FSHandlerException("notopened");
             }
-            synchronized (lockableStream) {
-                FileChannel channel = lockableStream.getStream().getChannel();
-                channel.write(buffer, writeOffset);
+            synchronized (lockable) {
+                RandomAccessFile file = lockable.getFile();
+                file.seek(writeOffset);
+                doWrite(file, buffer);
             }
             return (int) bufSize;
         } catch (FileNotFoundException e) {
@@ -243,39 +242,8 @@ public class TagsHandler extends UnsupportedFSHandler {
         }
     }
 
-    @Override
-    public void release(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
-        String strPath = filepath.asStringPath();
-        if (info.openMode() == OpenMode.READONLY || info.openMode() == OpenMode.READWRITE) {
-            LockableStream<FileInputStream> lockableStream = readStreamCache.get(strPath);
-            if (lockableStream == null) {
-                throw new FSHandlerException("notopened");
-            }
-            if (lockableStream.release() == 0) {
-                try {
-                    lockableStream.getStream().close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                readStreamCache.remove(strPath);
-            }
-        }
-        if (info.openMode() == OpenMode.WRITEONLY || info.openMode() == OpenMode.READWRITE) {
-            LockableStream<FileOutputStream> lockableStream = writeStreamCache.get(strPath);
-            if (lockableStream == null) {
-                throw new FSHandlerException("notopened");
-            }
-            if (lockableStream.release() == 0) {
-                try {
-                    lockableStream.getStream().close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                writeStreamCache.remove(strPath);
-            }
-
-        }
-        FSHandlerManager.removeFileFromCache(filepath);
+    private void doWrite(RandomAccessFile file, ByteBuffer buffer) throws IOException {
+        file.getChannel().write(buffer);
     }
 
 }
