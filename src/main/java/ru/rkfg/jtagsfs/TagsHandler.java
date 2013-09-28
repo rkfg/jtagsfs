@@ -230,7 +230,7 @@ public class TagsHandler extends UnsupportedFSHandler {
             synchronized (lockable) {
                 RandomAccessFile file = lockable.getFile();
                 file.seek(writeOffset);
-                doWrite(file, buffer);
+                file.getChannel().write(buffer);
             }
             return (int) bufSize;
         } catch (FileNotFoundException e) {
@@ -241,9 +241,4 @@ public class TagsHandler extends UnsupportedFSHandler {
             throw new FSHandlerException("err: " + e.getMessage());
         }
     }
-
-    private void doWrite(RandomAccessFile file, ByteBuffer buffer) throws IOException {
-        file.getChannel().write(buffer);
-    }
-
 }
