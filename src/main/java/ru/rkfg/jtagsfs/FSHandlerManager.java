@@ -177,7 +177,7 @@ public class FSHandlerManager {
     }
 
     public static File openFileByNameId(String name, Long id) {
-        return new File(STORAGE + "/" + id + IDSEPARATOR + name);
+        return new File(STORAGE + File.separator + id % 1000 + File.separator + id + IDSEPARATOR + name);
     }
 
     RootHandler rootHandler = new RootHandler();

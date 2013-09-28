@@ -100,6 +100,7 @@ public class TagsHandler extends UnsupportedFSHandler {
         } else {
             File file = FSHandlerManager.openFileByFilepath(filepath);
             try {
+                file.getParentFile().mkdirs();
                 file.createNewFile();
                 RandomAccessFile raFile = new RandomAccessFile(file, "rw");
                 fileCache.put(strPath, new LockableFile(raFile));
