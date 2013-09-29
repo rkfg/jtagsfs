@@ -43,6 +43,11 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
     }
 
     @Override
+    protected String getName() {
+        return "jtagsfs";
+    }
+
+    @Override
     public int create(String path, ModeWrapper mode, FileInfoWrapper info) {
         try {
             manager.create(path, info);
