@@ -35,6 +35,8 @@ public class FSHandlerManager {
 
     }
 
+    private static HashMap<String, File> fileCache = new HashMap<String, File>();
+
     public static List<String> fileRecordsToNames(List<FileRecord> fileRecords) {
         List<String> result = new LinkedList<String>();
         for (FileRecord fileRecord : fileRecords) {
@@ -172,8 +174,22 @@ public class FSHandlerManager {
     }
 
     public static File openFileByFilepath(Filepath filepath) {
-        FileRecord fileRecord = getFileRecordByFilepath(filepath);
-        return openFileByNameId(fileRecord.getName(), fileRecord.getId());
+        String strPath = filepath.asStringPath();
+        File result = fileCache.get(strPath);
+        if (result == null) {
+            FileRecord fileRecord = getFileRecordByFilepath(filepath);
+            result = openFileByNameId(fileRecord.getName(), fileRecord.getId());
+            synchronized (fileCache) {
+                fileCache.put(strPath, result);
+            }
+        }
+        return result;
+    }
+
+    public static void removeFileFromCache(Filepath filepath) {
+        synchronized (fileCache) {
+            fileCache.remove(filepath.asStringPath());
+        }
     }
 
     public static File openFileByNameId(String name, Long id) {

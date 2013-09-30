@@ -184,6 +184,8 @@ public class TagsHandler extends UnsupportedFSHandler {
                     FSHandlerManager.openFileByFilepath(from).renameTo(FSHandlerManager.openFileByNameId(to.getName(), fileRecord.getId()));
                 }
                 fileRecord.setName(to.getName());
+                FSHandlerManager.removeFileFromCache(from);
+                FSHandlerManager.removeFileFromCache(to);
                 return null;
             }
         });
@@ -214,6 +216,7 @@ public class TagsHandler extends UnsupportedFSHandler {
             public Void run(Session session) {
                 FSHandlerManager.openFileByFilepath(filepath).delete();
                 session.delete(FSHandlerManager.getFileRecordByFilepath(filepath, session));
+                FSHandlerManager.removeFileFromCache(filepath);
                 return null;
             }
         });
