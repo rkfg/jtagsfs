@@ -90,6 +90,14 @@ public class FSHandlerManager {
         }
     }
 
+    public static String stripFilename(String filename) {
+        int index = filename.lastIndexOf(IDSEPARATOR);
+        if (index > 0) {
+            return filename.substring(index + IDSEPARATOR.length());
+        }
+        return filename;
+    }
+
     public static List<String> getTags(final String[] exclude) {
         return getTags(exclude, true);
     }
@@ -127,14 +135,14 @@ public class FSHandlerManager {
         });
     }
 
-    public static List<FileRecord> listFiles(final String[] pathParts) {
-        return HibernateUtil.exec(new HibernateCallback<List<FileRecord>>() {
+    public static List<String> listFiles(final Filepath filepath) {
+        return HibernateUtil.exec(new HibernateCallback<List<String>>() {
 
-            public List<FileRecord> run(Session session) {
+            public List<String> run(Session session) {
                 StringBuilder where = new StringBuilder();
                 int n = 0;
                 HashMap<String, Object> params = new HashMap<String, Object>();
-                for (String tag : pathParts) {
+                for (String tag : filepath.getPath()) {
                     if (tag.equals(CONCATTAGS)) {
                         where.append(" or 1=1");
                     } else {
@@ -150,7 +158,8 @@ public class FSHandlerManager {
                 List<FileRecord> fileRecords = session
                         .createQuery("select f from FileRecord f where 1=1" + where.toString() + " order by f.name").setProperties(params)
                         .list();
-                if (fileRecords.size() > 1) {
+                // if we're in @@ directory, every file will have an id and tags anyway
+                if (fileRecords.size() > 1 && !filepath.isContentWithTags()) {
                     FileRecord curRec = fileRecords.get(0);
                     boolean doRename = false;
                     boolean equal = false;
@@ -168,7 +177,24 @@ public class FSHandlerManager {
                         curRec.setName(curRec.getId() + IDSEPARATOR + curRec.getName());
                     }
                 }
-                return fileRecords;
+                List<String> result = new LinkedList<String>();
+                if (filepath.isContentWithTags()) {
+                    StringBuilder strRecord = new StringBuilder();
+                    for (FileRecord fileRecord : fileRecords) {
+                        strRecord.append(fileRecord.getId()).append(IDSEPARATOR);
+                        for (Tag tag : fileRecord.getTags()) {
+                            strRecord.append(tag.getName()).append(IDSEPARATOR);
+                        }
+                        strRecord.append(fileRecord.getName());
+                        result.add(strRecord.toString());
+                        strRecord.setLength(0);
+                    }
+                } else {
+                    for (FileRecord fileRecord : fileRecords) {
+                        result.add(fileRecord.getName());
+                    }
+                }
+                return result;
             }
         });
     }
@@ -303,7 +329,7 @@ public class FSHandlerManager {
     public Filepath parseFilePath(String path) {
         String[] pathTags = splitPath(path);
         Filepath result = new Filepath();
-        if (pathTags.length > 1 && pathTags[pathTags.length - 2].equals(ENDOFTAGS)) {
+        if (pathTags.length > 1 && (pathTags[pathTags.length - 2].equals(ENDOFTAGS) || pathTags[pathTags.length - 2].equals(TAGGEDCONTENT))) {
             result.setName(pathTags[pathTags.length - 1]);
             result.setPath(Arrays.copyOf(pathTags, pathTags.length - 2));
         } else {
@@ -311,7 +337,13 @@ public class FSHandlerManager {
                 result.setPath(Arrays.copyOf(pathTags, pathTags.length - 1));
                 result.setContent(true);
             } else {
-                result.setPath(pathTags);
+                if (pathTags.length > 1 && pathTags[pathTags.length - 1].equals(TAGGEDCONTENT)) {
+                    result.setPath(Arrays.copyOf(pathTags, pathTags.length - 1));
+                    result.setContent(true);
+                    result.setContentWithTags(true);
+                } else {
+                    result.setPath(pathTags);
+                }
             }
         }
         return result;

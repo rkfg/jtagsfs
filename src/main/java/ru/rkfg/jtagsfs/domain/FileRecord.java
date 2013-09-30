@@ -6,6 +6,7 @@ import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.ManyToMany;
+import javax.persistence.OrderBy;
 
 @Entity
 public class FileRecord {
@@ -14,6 +15,7 @@ public class FileRecord {
     Long id;
     String name;
     @ManyToMany
+    @OrderBy("name")
     Set<Tag> tags;
 
     public FileRecord() {

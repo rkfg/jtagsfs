@@ -142,13 +142,14 @@ public class TagsHandler extends UnsupportedFSHandler {
                 tags = FSHandlerManager.getTags(filepath.getPath(), false);
                 tags.add(Consts.CONCATTAGS);
                 tags.add(Consts.ENDOFTAGS);
+                tags.add(Consts.TAGGEDCONTENT);
             }
             return tags;
         } else {
             if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
                 throw new FSHandlerException("Empty tags or rvalue in concat.");
             }
-            return FSHandlerManager.fileRecordsToNames(FSHandlerManager.listFiles(filepath.getPath()));
+            return FSHandlerManager.listFiles(filepath);
         }
     }
 
@@ -180,10 +181,11 @@ public class TagsHandler extends UnsupportedFSHandler {
                 FileRecord fileRecord = FSHandlerManager.getFileRecordByFilepath(from, session);
                 fileRecord.getTags().clear();
                 fileRecord.getTags().addAll(FSHandlerManager.getTagsEntries(to));
-                if (!fileRecord.getName().equals(to.getName())) {
-                    FSHandlerManager.openFileByFilepath(from).renameTo(FSHandlerManager.openFileByNameId(to.getName(), fileRecord.getId()));
+                String toName = FSHandlerManager.stripFilename(to.getName());
+                if (!fileRecord.getName().equals(toName)) {
+                    FSHandlerManager.openFileByFilepath(from).renameTo(FSHandlerManager.openFileByNameId(toName, fileRecord.getId()));
                 }
-                fileRecord.setName(to.getName());
+                fileRecord.setName(toName);
                 FSHandlerManager.removeFileFromCache(from);
                 FSHandlerManager.removeFileFromCache(to);
                 return null;

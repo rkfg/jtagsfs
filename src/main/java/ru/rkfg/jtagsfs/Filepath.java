@@ -5,6 +5,7 @@ import java.util.Arrays;
 
 public class Filepath implements Cloneable {
     boolean content;
+    boolean contentWithTags;
     String[] path;
     String name;
 
@@ -14,6 +15,14 @@ public class Filepath implements Cloneable {
 
     public void setContent(boolean content) {
         this.content = content;
+    }
+
+    public boolean isContentWithTags() {
+        return contentWithTags;
+    }
+
+    public void setContentWithTags(boolean contentWithTags) {
+        this.contentWithTags = contentWithTags;
     }
 
     public String[] getPath() {
