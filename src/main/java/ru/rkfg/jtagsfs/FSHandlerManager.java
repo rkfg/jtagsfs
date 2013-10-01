@@ -65,23 +65,19 @@ public class FSHandlerManager {
                     queryTags.append(" and '").append(tag).append("' in (select t.name from Tag t where t in elements(f.tags))");
                 }
             }
-            FileRecord fileRecord = (FileRecord) session.createQuery("from FileRecord f where f.name = :name and (1=1" + queryTags + ")")
-                    .setString("name", name).uniqueResult();
-            if (fileRecord != null) {
-                return fileRecord;
-            }
             int index = name.indexOf(IDSEPARATOR);
             if (index > 0) {
                 try {
                     Long id = Long.valueOf(name.substring(0, index));
-                    fileRecord = (FileRecord) session.get(FileRecord.class, id);
-                    if (fileRecord != null) {
-                        return fileRecord;
-                    }
-                    throw new RuntimeException("File with name " + name + " not found in DB and contains valid ID before separator.");
+                    queryTags.append(" and f.id = ").append(id);
                 } catch (NumberFormatException e) {
                     throw new RuntimeException("File with name " + name + " not found in DB and contains invalid ID before separator.");
                 }
+            }
+            FileRecord fileRecord = (FileRecord) session.createQuery("from FileRecord f where f.name = :name and (1=1" + queryTags + ")")
+                    .setString("name", FSHandlerManager.stripFilename(name)).uniqueResult();
+            if (fileRecord != null) {
+                return fileRecord;
             } else {
                 throw new RuntimeException("File with name " + name + " not found in DB.");
             }
