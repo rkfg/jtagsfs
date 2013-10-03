@@ -3,6 +3,7 @@ package ru.rkfg.jtagsfs.domain;
 import java.util.Set;
 
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.ManyToMany;
@@ -14,7 +15,7 @@ public class FileRecord {
     @GeneratedValue
     Long id;
     String name;
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @OrderBy("name")
     Set<Tag> tags;
 
