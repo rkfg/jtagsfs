@@ -16,6 +16,7 @@ import net.fusejna.StructStat.StatWrapper;
 import org.hibernate.Session;
 
 import ru.rkfg.jtagsfs.FSHandlerManager.FSHandlerException;
+import ru.rkfg.jtagsfs.FSHandlerManager.FSHandlerFileException;
 import ru.rkfg.jtagsfs.domain.FileRecord;
 import ru.rkfg.jtagsfs.domain.Tag;
 
@@ -183,6 +184,15 @@ public class TagsHandler extends UnsupportedFSHandler {
                 fileRecord.getTags().addAll(FSHandlerManager.getTagsEntries(to));
                 String toName = FSHandlerManager.stripFilename(to.getName());
                 if (!fileRecord.getName().equals(toName)) {
+                    try {
+                        File target = FSHandlerManager.openFileByFilepath(to);
+                        if (target.exists()) {
+                            // delete the target file
+                            unlink(to);
+                        }
+                    } catch (FSHandlerFileException e) {
+                        // file not found in DB, no need to delete target
+                    }
                     FSHandlerManager.openFileByFilepath(from).renameTo(FSHandlerManager.openFileByNameId(toName, fileRecord.getId()));
                 }
                 fileRecord.setName(toName);

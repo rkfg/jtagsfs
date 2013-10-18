@@ -35,6 +35,31 @@ public class FSHandlerManager {
 
     }
 
+    public static class FSHandlerRuntimeException extends RuntimeException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 3480870833432919617L;
+
+        public FSHandlerRuntimeException(String message) {
+            super(message);
+        }
+    }
+
+    public static class FSHandlerFileException extends FSHandlerRuntimeException {
+
+        /**
+         * 
+         */
+        private static final long serialVersionUID = 6910554242554795364L;
+
+        public FSHandlerFileException(String message) {
+            super(message);
+        }
+
+    }
+
     private static HashMap<String, File> fileCache = new HashMap<String, File>();
 
     public static List<String> fileRecordsToNames(List<FileRecord> fileRecords) {
@@ -71,7 +96,8 @@ public class FSHandlerManager {
                     Long id = Long.valueOf(name.substring(0, index));
                     queryTags.append(" and f.id = ").append(id);
                 } catch (NumberFormatException e) {
-                    throw new RuntimeException("File with name " + name + " not found in DB and contains invalid ID before separator.");
+                    throw new FSHandlerFileException("File with name " + name
+                            + " not found in DB and contains invalid ID before separator.");
                 }
             }
             FileRecord fileRecord = (FileRecord) session.createQuery("from FileRecord f where f.name = :name and (1=1" + queryTags + ")")
@@ -79,10 +105,10 @@ public class FSHandlerManager {
             if (fileRecord != null) {
                 return fileRecord;
             } else {
-                throw new RuntimeException("File with name " + name + " not found in DB.");
+                throw new FSHandlerFileException("File with name " + name + " not found in DB.");
             }
         } catch (NonUniqueResultException e) {
-            throw new RuntimeException("Duplicate files found with name " + name);
+            throw new FSHandlerFileException("Duplicate files found with name " + name);
         }
     }
 
