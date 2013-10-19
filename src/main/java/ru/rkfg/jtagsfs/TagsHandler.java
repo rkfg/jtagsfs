@@ -35,8 +35,8 @@ public class TagsHandler extends UnsupportedFSHandler {
             return stream;
         }
 
-        public void lock() {
-            lockCount++;
+        public int lock() {
+            return ++lockCount;
         }
 
         public int release() {
@@ -94,19 +94,21 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     @Override
     public void open(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
-        String strPath = filepath.asStringPath();
-        LockableFile lockable = fileCache.get(strPath);
-        if (lockable != null) {
-            lockable.lock();
-        } else {
-            File file = FSHandlerManager.openFileByFilepath(filepath);
-            try {
-                file.getParentFile().mkdirs();
-                file.createNewFile();
-                RandomAccessFile raFile = new RandomAccessFile(file, "rw");
-                fileCache.put(strPath, new LockableFile(raFile));
-            } catch (IOException e) {
-                e.printStackTrace();
+        synchronized (fileCache) {
+            String strPath = filepath.asStringPath();
+            LockableFile lockable = fileCache.get(strPath);
+            if (lockable != null) {
+                lockable.lock();
+            } else {
+                File file = FSHandlerManager.openFileByFilepath(filepath);
+                try {
+                    file.getParentFile().mkdirs();
+                    file.createNewFile();
+                    RandomAccessFile raFile = new RandomAccessFile(file, "rw");
+                    fileCache.put(strPath, new LockableFile(raFile));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
@@ -115,7 +117,10 @@ public class TagsHandler extends UnsupportedFSHandler {
     public int read(Filepath filepath, ByteBuffer buffer, long size, long offset) throws FSHandlerException {
         try {
             String strPath = filepath.asStringPath();
-            LockableFile lockableStream = fileCache.get(strPath);
+            LockableFile lockableStream;
+            synchronized (fileCache) {
+                lockableStream = fileCache.get(strPath);
+            }
             if (lockableStream == null) {
                 throw new FSHandlerException("notopened");
             }
@@ -156,18 +161,20 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     @Override
     public void release(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
-        String strPath = filepath.asStringPath();
-        LockableFile lockableFile = fileCache.get(strPath);
-        if (lockableFile == null) {
-            throw new FSHandlerException("notopened");
-        }
-        if (lockableFile.release() == 0) {
-            try {
-                lockableFile.getFile().close();
-            } catch (IOException e) {
-                e.printStackTrace();
+        synchronized (fileCache) {
+            String strPath = filepath.asStringPath();
+            LockableFile lockableFile = fileCache.get(strPath);
+            if (lockableFile == null) {
+                throw new FSHandlerException("notopened");
             }
-            fileCache.remove(strPath);
+            if (lockableFile.release() == 0) {
+                try {
+                    lockableFile.getFile().close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                fileCache.remove(strPath);
+            }
         }
     }
 
@@ -239,7 +246,10 @@ public class TagsHandler extends UnsupportedFSHandler {
     public int write(Filepath filepath, ByteBuffer buffer, long bufSize, long writeOffset) throws FSHandlerException {
         try {
             String strPath = filepath.asStringPath();
-            LockableFile lockable = fileCache.get(strPath);
+            LockableFile lockable;
+            synchronized (fileCache) {
+                lockable = fileCache.get(strPath);
+            }
             if (lockable == null) {
                 throw new FSHandlerException("notopened");
             }
