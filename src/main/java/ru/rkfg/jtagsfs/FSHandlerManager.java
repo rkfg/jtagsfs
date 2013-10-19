@@ -83,6 +83,7 @@ public class FSHandlerManager {
         String name = filepath.getName();
         try {
             StringBuilder queryTags = new StringBuilder();
+            queryTags.append("from FileRecord f where f.name = :name and (1=1");
             for (String tag : filepath.getPath()) {
                 if (tag.equals(CONCATTAGS)) {
                     queryTags.append(" or 1=1");
@@ -90,6 +91,7 @@ public class FSHandlerManager {
                     queryTags.append(" and '").append(tag).append("' in (select t.name from Tag t where t in elements(f.tags))");
                 }
             }
+            queryTags.append(")");
             int index = name.indexOf(IDSEPARATOR);
             if (index > 0) {
                 try {
@@ -100,7 +102,7 @@ public class FSHandlerManager {
                             + " not found in DB and contains invalid ID before separator.");
                 }
             }
-            FileRecord fileRecord = (FileRecord) session.createQuery("from FileRecord f where f.name = :name and (1=1" + queryTags + ")")
+            FileRecord fileRecord = (FileRecord) session.createQuery(queryTags.toString())
                     .setString("name", FSHandlerManager.stripFilename(name)).uniqueResult();
             if (fileRecord != null) {
                 return fileRecord;
