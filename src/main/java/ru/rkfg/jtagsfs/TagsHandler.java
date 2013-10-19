@@ -71,7 +71,7 @@ public class TagsHandler extends UnsupportedFSHandler {
                 stat.size(file.length());
                 stat.mode(VirtualEntry.FILEMODE);
                 stat.setAllTimesMillis(file.lastModified());
-            } catch (RuntimeException e) {
+            } catch (FSHandlerFileException e) {
                 throw new FSHandlerException("notfound");
             }
         }
