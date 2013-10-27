@@ -76,6 +76,10 @@ public class FSHandlerManager {
             return created;
         }
 
+        public void setCreated(long created) {
+            this.created = created;
+        }
+
         public CachedFile(File file) {
             super();
             this.file = file;
@@ -94,13 +98,16 @@ public class FSHandlerManager {
 
                     long curTime = System.currentTimeMillis();
                     Iterator<Entry<String, CachedFile>> iter = fileCache.entrySet().iterator();
+                    int count = 0;
                     while (iter.hasNext()) {
                         Entry<String, CachedFile> entry = iter.next();
                         CachedFile cachedFile = entry.getValue();
                         if (curTime - cachedFile.getCreated() > CACHECLEANUPPERIOD) {
                             iter.remove();
+                            count++;
                         }
                     }
+                    System.err.println("Cleaned " + count + " file records. " + fileCache.size() + " retained.");
                 }
             }
         }, CACHECLEANUPPERIOD, CACHECLEANUPPERIOD);
@@ -275,6 +282,8 @@ public class FSHandlerManager {
                 FileRecord fileRecord = getFileRecordByFilepath(filepath);
                 cachedFile = new CachedFile(openFileByNameId(fileRecord.getName(), fileRecord.getId()));
                 fileCache.put(strPath, cachedFile);
+            } else {
+                cachedFile.setCreated(System.currentTimeMillis());
             }
             return cachedFile.getFile();
         }
