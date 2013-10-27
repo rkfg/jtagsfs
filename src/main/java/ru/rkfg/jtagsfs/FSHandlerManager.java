@@ -6,8 +6,12 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map.Entry;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import net.fusejna.DirectoryFiller;
 import net.fusejna.ErrorCodes;
@@ -60,7 +64,47 @@ public class FSHandlerManager {
 
     }
 
-    private static HashMap<String, File> fileCache = new HashMap<String, File>();
+    private static class CachedFile {
+        private File file;
+        private long created;
+
+        public File getFile() {
+            return file;
+        }
+
+        public long getCreated() {
+            return created;
+        }
+
+        public CachedFile(File file) {
+            super();
+            this.file = file;
+            this.created = System.currentTimeMillis();
+        }
+
+    }
+
+    private static HashMap<String, CachedFile> fileCache = new HashMap<String, CachedFile>();
+    static {
+        new Timer("file cache cleanup").schedule(new TimerTask() {
+
+            @Override
+            public void run() {
+                synchronized (fileCache) {
+
+                    long curTime = System.currentTimeMillis();
+                    Iterator<Entry<String, CachedFile>> iter = fileCache.entrySet().iterator();
+                    while (iter.hasNext()) {
+                        Entry<String, CachedFile> entry = iter.next();
+                        CachedFile cachedFile = entry.getValue();
+                        if (curTime - cachedFile.getCreated() > CACHECLEANUPPERIOD) {
+                            iter.remove();
+                        }
+                    }
+                }
+            }
+        }, CACHECLEANUPPERIOD, CACHECLEANUPPERIOD);
+    }
 
     public static List<String> fileRecordsToNames(List<FileRecord> fileRecords) {
         List<String> result = new LinkedList<String>();
@@ -225,15 +269,15 @@ public class FSHandlerManager {
 
     public static File openFileByFilepath(Filepath filepath) {
         String strPath = filepath.asStringPath();
-        File result = fileCache.get(strPath);
-        if (result == null) {
-            FileRecord fileRecord = getFileRecordByFilepath(filepath);
-            result = openFileByNameId(fileRecord.getName(), fileRecord.getId());
-            synchronized (fileCache) {
-                fileCache.put(strPath, result);
+        synchronized (fileCache) {
+            CachedFile cachedFile = fileCache.get(strPath);
+            if (cachedFile == null) {
+                FileRecord fileRecord = getFileRecordByFilepath(filepath);
+                cachedFile = new CachedFile(openFileByNameId(fileRecord.getName(), fileRecord.getId()));
+                fileCache.put(strPath, cachedFile);
             }
+            return cachedFile.getFile();
         }
-        return result;
     }
 
     public static void removeFileFromCache(Filepath filepath) {
