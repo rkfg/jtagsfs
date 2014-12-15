@@ -142,17 +142,18 @@ public class TagsHandler extends UnsupportedFSHandler {
     public List<String> readdir(Filepath filepath) throws FSHandlerException {
         if (!filepath.isContent()) {
             List<String> tags;
-            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS) || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
                 tags = FSHandlerManager.getTags(new String[0]);
             } else {
                 tags = FSHandlerManager.getTags(filepath.getPath(), false);
                 tags.add(Consts.CONCATTAGS);
+                tags.add(Consts.EXCLUDETAGS);
                 tags.add(Consts.ENDOFTAGS);
                 tags.add(Consts.TAGGEDCONTENT);
             }
             return tags;
         } else {
-            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS) || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
                 throw new FSHandlerException("Empty tags or rvalue in concat.");
             }
             return FSHandlerManager.listFiles(filepath);

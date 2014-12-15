@@ -136,11 +136,16 @@ public class FSHandlerManager {
         try {
             StringBuilder queryTags = new StringBuilder();
             queryTags.append("from FileRecord f where f.name = :name and (1=1");
+            boolean negate = false;
             for (String tag : filepath.getPath()) {
                 if (tag.equals(CONCATTAGS)) {
                     queryTags.append(" or 1=1");
+                } else if (tag.equals(EXCLUDETAGS)) {
+                    negate = true;
                 } else {
-                    queryTags.append(" and '").append(tag).append("' in (select t.name from Tag t where t in elements(f.tags))");
+                    queryTags.append(" and '").append(tag).append("' ").append(negate ? "not " : "")
+                            .append("in (select t.name from Tag t where t in elements(f.tags))");
+                    negate = false;
                 }
             }
             queryTags.append(")");
@@ -218,13 +223,17 @@ public class FSHandlerManager {
                 StringBuilder where = new StringBuilder();
                 int n = 0;
                 HashMap<String, Object> params = new HashMap<String, Object>();
+                boolean negate = false;
                 for (String tag : filepath.getPath()) {
                     if (tag.equals(CONCATTAGS)) {
                         where.append(" or 1=1");
+                    } else if (tag.equals(EXCLUDETAGS)) {
+                        negate = true;
                     } else {
                         Tag tagEntity = (Tag) session.createQuery("from Tag t where t.name = :tag").setString("tag", tag).uniqueResult();
                         if (tagEntity != null) {
-                            where.append(" and :tag" + n + " in elements(f.tags)");
+                            where.append(" and :tag" + n + (negate ? " not" : "") + " in elements(f.tags)");
+                            negate = false;
                             params.put("tag" + n, tagEntity);
                         }
                         n++;
