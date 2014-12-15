@@ -137,14 +137,18 @@ public class FSHandlerManager {
             StringBuilder queryTags = new StringBuilder();
             queryTags.append("from FileRecord f where f.name = :name and (1=1");
             boolean negate = false;
+            HashMap<String, Object> tagParams = new HashMap<String, Object>();
+            int tagIndex = 0;
             for (String tag : filepath.getPath()) {
                 if (tag.equals(CONCATTAGS)) {
                     queryTags.append(" or 1=1");
                 } else if (tag.equals(EXCLUDETAGS)) {
                     negate = true;
                 } else {
-                    queryTags.append(" and '").append(tag).append("' ").append(negate ? "not " : "")
+                    queryTags.append(" and :t").append(tagIndex).append(" ").append(negate ? "not " : "")
                             .append("in (select t.name from Tag t where t in elements(f.tags))");
+                    tagParams.put("t" + tagIndex, tag);
+                    tagIndex++;
                     negate = false;
                 }
             }
@@ -160,7 +164,7 @@ public class FSHandlerManager {
                 }
             }
             FileRecord fileRecord = (FileRecord) session.createQuery(queryTags.toString())
-                    .setString("name", FSHandlerManager.stripFilename(name)).uniqueResult();
+                    .setString("name", FSHandlerManager.stripFilename(name)).setProperties(tagParams).uniqueResult();
             if (fileRecord != null) {
                 return fileRecord;
             } else {
