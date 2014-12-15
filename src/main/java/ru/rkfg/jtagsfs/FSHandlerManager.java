@@ -532,5 +532,6 @@ public class FSHandlerManager {
 
     public static void stopTimers() {
         cleanupTimer.cancel();
+        HibernateUtil.cleanup();
     }
 }
