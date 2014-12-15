@@ -89,8 +89,9 @@ public class FSHandlerManager {
     }
 
     private static HashMap<String, CachedFile> fileCache = new HashMap<String, CachedFile>();
+    private static Timer cleanupTimer = new Timer("file cache cleanup");
     static {
-        new Timer("file cache cleanup").schedule(new TimerTask() {
+        cleanupTimer.schedule(new TimerTask() {
 
             @Override
             public void run() {
@@ -514,5 +515,9 @@ public class FSHandlerManager {
         Filepath filepath = parseFilePath(path);
         FSHandler handler = getHandlerByPath(filepath);
         handler.release(strip(filepath, handler), info);
+    }
+
+    public static void stopTimers() {
+        cleanupTimer.cancel();
     }
 }
