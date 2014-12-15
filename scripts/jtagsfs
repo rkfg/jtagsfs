@@ -1,0 +1,2 @@
+cd "$(dirname "$0")"
+java -Xmx32m -Djna.nosys=true -jar jtagsfs.jar -o big_writes $@
