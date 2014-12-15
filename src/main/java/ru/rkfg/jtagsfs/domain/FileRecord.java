@@ -6,10 +6,13 @@ import javax.persistence.Entity;
 import javax.persistence.FetchType;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.Index;
 import javax.persistence.ManyToMany;
 import javax.persistence.OrderBy;
+import javax.persistence.Table;
 
 @Entity
+@Table(indexes = { @Index(columnList = "name") })
 public class FileRecord {
     @Id
     @GeneratedValue
