@@ -34,4 +34,6 @@ public interface FSHandler {
     public void open(Filepath filepath, FileInfoWrapper info) throws FSHandlerException;
 
     public void release(Filepath filepath, FileInfoWrapper info) throws FSHandlerException;
+
+    public void rmdir(Filepath strip) throws FSHandlerException;
 }

@@ -83,4 +83,27 @@ public class ControlHandler extends UnsupportedFSHandler {
         });
     }
 
+    @Override
+    public void rmdir(final Filepath filepath) throws FSHandlerException {
+        String result = HibernateUtil.exec(new HibernateCallback<String>() {
+
+            @Override
+            public String run(Session session) {
+                String tagName = filepath.getPathLast();
+                Tag toDelete = (Tag) session.createQuery("from Tag t where t.name = :t").setString("t", tagName).uniqueResult();
+                if (toDelete == null) {
+                    return "notfound";
+                }
+                if (toDelete.getFiles().size() > 0) {
+                    return "access";
+                }
+                session.delete(toDelete);
+                return null;
+            }
+        });
+        if (result != null) {
+            throw new FSHandlerException(result);
+        }
+    }
+
 }

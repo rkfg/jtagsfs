@@ -160,4 +160,20 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
         FSHandlerManager.stopTimers();
     }
 
+    @Override
+    public int rmdir(String path) {
+        try {
+            manager.rmdir(path);
+        } catch (FSHandlerException e) {
+            if (e.getMessage().equals("notfound")) {
+                return -ErrorCodes.ENOENT();
+            }
+            if (e.getMessage().equals("access")) {
+                return -ErrorCodes.EACCES();
+            }
+            return -ErrorCodes.EINVAL();
+        }
+        return 0;
+    }
+
 }

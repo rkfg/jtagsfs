@@ -534,4 +534,10 @@ public class FSHandlerManager {
         cleanupTimer.cancel();
         HibernateUtil.cleanup();
     }
+
+    public void rmdir(String path) throws FSHandlerException {
+        Filepath filepath = parseFilePath(path);
+        FSHandler handler = getHandlerByPath(filepath);
+        handler.rmdir(strip(filepath, handler));
+    }
 }

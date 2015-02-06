@@ -46,6 +46,14 @@ public class Tag {
         this.name = name;
     }
 
+    public Set<FileRecord> getFiles() {
+        return files;
+    }
+
+    public void setFiles(Set<FileRecord> files) {
+        this.files = files;
+    }
+
     public Tag getParent() {
         return parent;
     }
