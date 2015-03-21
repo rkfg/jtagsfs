@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -68,7 +69,18 @@ public class TagsHandler extends UnsupportedFSHandler {
 
                     @Override
                     public Boolean run(Session session) {
-                        return FSHandlerManager.getTagByName(filepath.getPathLast(), session) != null;
+                        Tag tag = FSHandlerManager.getTagByName(filepath.getPathLast(), session);
+                        if (tag == null) {
+                            return false;
+                        }
+                        if (tag.getParent() != null) {
+                            if (filepath.getPathLength() > 1) {
+                                return Arrays.asList(filepath.getPath()).contains(tag.getParent().getName());
+                            } else {
+                                return false;
+                            }
+                        }
+                        return true;
                     }
                 });
                 if (!tagExists) {
@@ -154,7 +166,8 @@ public class TagsHandler extends UnsupportedFSHandler {
     public List<String> readdir(Filepath filepath) throws FSHandlerException {
         if (!filepath.isContent()) {
             List<String> tags;
-            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS) || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)
+                    || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
                 tags = FSHandlerManager.getTags(new String[0]);
             } else {
                 tags = FSHandlerManager.getTags(filepath.getPath(), false);
@@ -165,7 +178,8 @@ public class TagsHandler extends UnsupportedFSHandler {
             }
             return tags;
         } else {
-            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS) || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)
+                    || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
                 throw new FSHandlerException("Empty tags or rvalue in concat.");
             }
             return FSHandlerManager.listFiles(filepath);
@@ -193,12 +207,16 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     @Override
     public void rename(final Filepath from, final Filepath to) throws FSHandlerException {
-        if (from.getName() == null) {
+        if (from.getName() == null && (!from.isTagPath() || !to.isTagPath() || to.getName() != null)) {
             throw new FSHandlerException("notsupp");
         }
         HibernateUtil.exec(new HibernateCallback<Void>() {
 
             public Void run(Session session) {
+                if (from.getName() == null) {
+                    FSHandlerManager.renameTag(from, to, session);
+                    return null;
+                }
                 FileRecord fileRecord = FSHandlerManager.getFileRecordByFilepath(from, session);
                 fileRecord.getTags().clear();
                 fileRecord.getTags().addAll(FSHandlerManager.getTagsEntries(to));

@@ -56,17 +56,7 @@ public class ControlHandler extends UnsupportedFSHandler {
 
             @Override
             public Void run(Session session) {
-                String fromTagName = from.getPathLast();
-                String toTagName = to.getPathLast();
-                Tag fromTag = FSHandlerManager.getTagByName(fromTagName, session);
-                fromTag.setName(toTagName);
-                if (to.getPathLength() > 1) {
-                    String toParentTagName = to.getPath()[to.getPathLength() - 2];
-                    Tag parentTag = FSHandlerManager.getTagByName(toParentTagName, session);
-                    fromTag.setParent(parentTag);
-                } else {
-                    fromTag.setParent(null);
-                }
+                FSHandlerManager.renameTag(from, to, session);
                 return null;
             }
         });
