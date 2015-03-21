@@ -1,9 +1,6 @@
 package ru.rkfg.jtagsfs;
 
-import static ru.rkfg.jtagsfs.Consts.*;
-
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.List;
 
 import net.fusejna.StructStat.StatWrapper;
@@ -47,15 +44,7 @@ public class ControlHandler extends UnsupportedFSHandler {
 
     @Override
     public void mkdir(Filepath filepath) throws FSHandlerException {
-        List<String> tags = Arrays.asList(filepath.getPath());
-        if (tags.size() == 0 || tags.contains(ENDOFTAGS)) {
-            throw new FSHandlerException("invaliddir");
-        }
-        if (filepath.getPathLength() > 1) {
-            FSHandlerManager.addTag(filepath.getPathLast(), filepath.getPath()[filepath.getPathLength() - 2]);
-        } else {
-            FSHandlerManager.addTag(filepath.getPathLast());
-        }
+        FSHandlerManager.addTagForFilepath(filepath);
     }
 
     @Override

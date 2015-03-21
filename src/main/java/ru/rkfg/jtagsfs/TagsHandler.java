@@ -61,8 +61,20 @@ public class TagsHandler extends UnsupportedFSHandler {
     }
 
     @Override
-    public void getattr(Filepath filepath, StatWrapper stat) throws FSHandlerException {
+    public void getattr(final Filepath filepath, StatWrapper stat) throws FSHandlerException {
         if (filepath.getName() == null) {
+            if (filepath.isTagPath()) {
+                Boolean tagExists = HibernateUtil.exec(new HibernateCallback<Boolean>() {
+
+                    @Override
+                    public Boolean run(Session session) {
+                        return FSHandlerManager.getTagByName(filepath.getPathLast(), session) != null;
+                    }
+                });
+                if (!tagExists) {
+                    throw new FSHandlerException("notfound");
+                }
+            }
             stat.mode(VirtualEntry.DIRMODE);
             stat.size(4096);
         } else {
@@ -89,7 +101,7 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     @Override
     public void mkdir(Filepath filepath) throws FSHandlerException {
-        throw new FSHandlerException("invaliddir");
+        FSHandlerManager.addTagForFilepath(filepath);
     }
 
     @Override

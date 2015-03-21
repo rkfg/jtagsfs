@@ -21,6 +21,12 @@ public class Filepath implements Cloneable {
         return contentWithTags;
     }
 
+    public boolean isTagPath() {
+        String pathLast = getPathLast();
+        return !content && !pathLast.equals(Consts.ENDOFTAGS) && !pathLast.equals(Consts.EXCLUDETAGS)
+                && !pathLast.equals(Consts.CONCATTAGS) && !pathLast.equals(Consts.TAGGEDCONTENT);
+    }
+
     public void setContentWithTags(boolean contentWithTags) {
         this.contentWithTags = contentWithTags;
     }

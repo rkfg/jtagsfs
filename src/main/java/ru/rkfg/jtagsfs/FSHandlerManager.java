@@ -326,6 +326,18 @@ public class FSHandlerManager {
         }
     }
 
+    public static void addTagForFilepath(Filepath filepath) throws FSHandlerException {
+        List<String> tags = Arrays.asList(filepath.getPath());
+        if (tags.size() == 0 || tags.contains(ENDOFTAGS)) {
+            throw new FSHandlerException("invaliddir");
+        }
+        if (filepath.getPathLength() > 1) {
+            addTag(filepath.getPathLast(), filepath.getPath()[filepath.getPathLength() - 2]);
+        } else {
+            addTag(filepath.getPathLast());
+        }
+    }
+
     public static void addTag(final String newTag) {
         addTag(newTag, null);
     }

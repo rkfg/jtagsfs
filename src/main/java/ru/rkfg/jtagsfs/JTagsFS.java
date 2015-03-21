@@ -53,7 +53,7 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
             manager.create(path, info);
             return 0;
         } catch (FSHandlerException e) {
-            return -ErrorCodes.ENOTSUP();
+            return -ErrorCodes.EACCES();
         }
     }
 
@@ -120,7 +120,7 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
             manager.rename(path, newName);
             return 0;
         } catch (FSHandlerException e) {
-            return -ErrorCodes.ENOTSUP();
+            return -ErrorCodes.EACCES();
         }
     }
 
@@ -130,7 +130,7 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
             manager.unlink(path);
             return 0;
         } catch (FSHandlerException e) {
-            return -ErrorCodes.ENOTSUP();
+            return -ErrorCodes.EACCES();
         }
     }
 
