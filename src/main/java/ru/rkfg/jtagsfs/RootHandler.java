@@ -15,7 +15,7 @@ public class RootHandler extends UnsupportedFSHandler {
     VirtualDirectory virtualDirectory = new VirtualDirectory();
 
     public RootHandler() {
-        handlers.addAll(Arrays.asList(new StatHandler(), new ControlHandler(), new TagsHandler()));
+        handlers.addAll(Arrays.asList(new ControlHandler(), new TagsHandler()));
         for (FSHandler handler : handlers) {
             virtualDirectory.add(new VirtualEntry(handler.getPrefix(), EntryType.DIR, 4096));
         }
