@@ -46,6 +46,10 @@ public class HibernateUtil {
         }
     }
 
+    public static Session getSession() {
+        return sessionFactory.openSession();
+    }
+
     public static void cleanup() {
         sessionFactory.close();
         sessionFactory = null;

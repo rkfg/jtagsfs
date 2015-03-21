@@ -48,6 +48,9 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     private HashMap<String, LockableFile> fileCache = new HashMap<String, LockableFile>();
 
+    // this permanent session is only used for tags enumeration purposes, it won't be closed/reopened for performance reasons
+    private Session getattrSession = HibernateUtil.getSession();
+
     @Override
     public void create(final Filepath filepath, final FileInfoWrapper info) throws FSHandlerException {
         if (!filepath.getStrippedFilename().equals(filepath.getName())) {
@@ -69,26 +72,12 @@ public class TagsHandler extends UnsupportedFSHandler {
     public void getattr(final Filepath filepath, StatWrapper stat) throws FSHandlerException {
         if (filepath.getName() == null) {
             if (filepath.isTagPath()) {
-                Boolean tagExists = HibernateUtil.exec(new HibernateCallback<Boolean>() {
-
-                    @Override
-                    public Boolean run(Session session) {
-                        Tag tag = FSHandlerManager.getTagByName(filepath.getPathLast(), session);
-                        if (tag == null) {
-                            return false;
-                        }
-                        if (tag.getParent() != null) {
-                            if (filepath.getPathLength() > 1) {
-                                return Arrays.asList(filepath.getPath()).contains(tag.getParent().getName());
-                            } else {
-                                return false;
-                            }
-                        }
-                        return true;
+                synchronized (getattrSession) {
+                    Tag tag = FSHandlerManager.getTagByName(filepath.getPathLast(), getattrSession);
+                    if (tag == null || tag.getParent() != null
+                            && (filepath.getPathLength() < 2 || !Arrays.asList(filepath.getPath()).contains(tag.getParent().getName()))) {
+                        throw new FSHandlerException("notfound");
                     }
-                });
-                if (!tagExists) {
-                    throw new FSHandlerException("notfound");
                 }
             }
             stat.mode(VirtualEntry.DIRMODE);
