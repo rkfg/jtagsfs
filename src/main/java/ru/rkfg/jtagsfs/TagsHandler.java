@@ -50,10 +50,14 @@ public class TagsHandler extends UnsupportedFSHandler {
 
     @Override
     public void create(final Filepath filepath, final FileInfoWrapper info) throws FSHandlerException {
+        if (!filepath.getStrippedFilename().equals(filepath.getName())) {
+            throw new FSHandlerException("notfound");
+        }
         HibernateUtil.exec(new HibernateCallback<Void>() {
 
             public Void run(Session session) {
-                FileRecord fileRecord = new FileRecord(filepath.getName(), new HashSet<Tag>(FSHandlerManager.getTagsEntries(filepath)));
+                FileRecord fileRecord = new FileRecord(filepath.getStrippedFilename(), new HashSet<Tag>(FSHandlerManager
+                        .getTagsEntries(filepath)));
                 session.save(fileRecord);
                 return null;
             }
@@ -221,7 +225,7 @@ public class TagsHandler extends UnsupportedFSHandler {
                 FileRecord fileRecord = FSHandlerManager.getFileRecordByFilepath(from, session);
                 fileRecord.getTags().clear();
                 fileRecord.getTags().addAll(FSHandlerManager.getTagsEntries(to));
-                String toName = FSHandlerManager.stripFilename(to.getName());
+                String toName = to.getStrippedFilename();
                 if (!fileRecord.getName().equals(toName)) {
                     try {
                         File target = FSHandlerManager.openFileByFilepath(to);

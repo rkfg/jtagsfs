@@ -1,5 +1,7 @@
 package ru.rkfg.jtagsfs;
 
+import static ru.rkfg.jtagsfs.Consts.*;
+
 import java.io.File;
 import java.util.Arrays;
 
@@ -109,5 +111,13 @@ public class Filepath implements Cloneable {
             sb.append(File.separator).append(Consts.ENDOFTAGS).append(File.separator).append(name);
         }
         return sb.toString();
+    }
+
+    public String getStrippedFilename() {
+        int index = name.lastIndexOf(IDSEPARATOR);
+        if (index > 0) {
+            return name.substring(index + IDSEPARATOR.length());
+        }
+        return name;
     }
 }

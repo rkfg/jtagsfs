@@ -164,7 +164,7 @@ public class FSHandlerManager {
                 }
             }
             FileRecord fileRecord = (FileRecord) session.createQuery(queryTags.toString())
-                    .setString("name", FSHandlerManager.stripFilename(name)).setProperties(tagParams).uniqueResult();
+                    .setString("name", filepath.getStrippedFilename()).setProperties(tagParams).uniqueResult();
             if (fileRecord != null) {
                 return fileRecord;
             } else {
@@ -173,14 +173,6 @@ public class FSHandlerManager {
         } catch (NonUniqueResultException e) {
             throw new FSHandlerFileException("Duplicate files found with name " + name);
         }
-    }
-
-    public static String stripFilename(String filename) {
-        int index = filename.lastIndexOf(IDSEPARATOR);
-        if (index > 0) {
-            return filename.substring(index + IDSEPARATOR.length());
-        }
-        return filename;
     }
 
     public static List<String> getTags(final String[] exclude) {
