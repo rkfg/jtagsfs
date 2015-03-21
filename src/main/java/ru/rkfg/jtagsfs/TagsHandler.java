@@ -166,9 +166,10 @@ public class TagsHandler extends UnsupportedFSHandler {
     public List<String> readdir(Filepath filepath) throws FSHandlerException {
         if (!filepath.isContent()) {
             List<String> tags;
-            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)
-                    || filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
+            if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
                 tags = FSHandlerManager.getTags(new String[0]);
+            } else if (filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {
+                tags = FSHandlerManager.getTags(filepath.getPath(), false);
             } else {
                 tags = FSHandlerManager.getTags(filepath.getPath(), false);
                 tags.add(Consts.CONCATTAGS);
