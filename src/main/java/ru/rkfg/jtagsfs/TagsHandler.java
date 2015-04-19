@@ -74,9 +74,18 @@ public class TagsHandler extends UnsupportedFSHandler {
             if (filepath.isTagPath()) {
                 synchronized (getattrSession) {
                     Tag tag = FSHandlerManager.getTagByName(filepath.getPathLast(), getattrSession);
-                    if (tag == null || tag.getParent() != null
-                            && (filepath.getPathLength() < 2 || !Arrays.asList(filepath.getPath()).contains(tag.getParent().getName()))) {
+                    if (tag == null) {
                         throw new FSHandlerException("notfound");
+                    }
+                    if (checkLackOfParent(filepath, tag)) {
+                        // this is not normal, tag has a parent but it's not present in the file path.
+                        // There's a chance that the tag was renamed/moved so we're clearing the session cache and trying again.
+                        getattrSession.clear();
+                        tag = FSHandlerManager.getTagByName(filepath.getPathLast(), getattrSession);
+                        if (checkLackOfParent(filepath, tag)) {
+                            // we've failed twice so this should be an actual error
+                            throw new FSHandlerException("notfound");
+                        }
                     }
                 }
             }
@@ -92,6 +101,11 @@ public class TagsHandler extends UnsupportedFSHandler {
                 throw new FSHandlerException("notfound");
             }
         }
+    }
+
+    private boolean checkLackOfParent(final Filepath filepath, Tag tag) {
+        return tag.getParent() != null
+                && (filepath.getPathLength() < 2 || !Arrays.asList(filepath.getPath()).contains(tag.getParent().getName()));
     }
 
     @Override
