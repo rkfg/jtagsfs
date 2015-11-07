@@ -10,7 +10,7 @@ import org.hibernate.Session;
 import ru.rkfg.jtagsfs.FSHandlerManager.FSHandlerException;
 import ru.rkfg.jtagsfs.domain.Tag;
 
-public class ControlHandler extends UnsupportedFSHandler {
+public class ControlHandler extends AbstractTagsHandler {
 
     @Override
     public String getPrefix() {
@@ -19,7 +19,7 @@ public class ControlHandler extends UnsupportedFSHandler {
 
     @Override
     public List<String> readdir(Filepath filepath) {
-        return FSHandlerManager.getTags(filepath.getPath(), true);
+        return getTags(filepath.getPath(), true);
     }
 
     @Override
@@ -44,7 +44,7 @@ public class ControlHandler extends UnsupportedFSHandler {
 
     @Override
     public void mkdir(Filepath filepath) throws FSHandlerException {
-        FSHandlerManager.addTagForFilepath(filepath);
+        addTagForFilepath(filepath);
     }
 
     @Override
@@ -56,7 +56,7 @@ public class ControlHandler extends UnsupportedFSHandler {
 
             @Override
             public Void run(Session session) {
-                FSHandlerManager.renameTag(from, to, session);
+                renameTag(from, to, session);
                 return null;
             }
         });

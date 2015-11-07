@@ -6,23 +6,13 @@ import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import net.fusejna.DirectoryFiller;
-import net.fusejna.ErrorCodes;
 import net.fusejna.StructFuseFileInfo.FileInfoWrapper;
 import net.fusejna.StructStat.StatWrapper;
-
-import org.hibernate.NonUniqueResultException;
-import org.hibernate.Session;
-
 import ru.rkfg.jtagsfs.domain.FileRecord;
-import ru.rkfg.jtagsfs.domain.Tag;
 
 public class FSHandlerManager {
 
@@ -64,259 +54,12 @@ public class FSHandlerManager {
 
     }
 
-    private static class CachedFile {
-        private File file;
-        private long created;
-
-        public File getFile() {
-            return file;
-        }
-
-        public long getCreated() {
-            return created;
-        }
-
-        public void setCreated(long created) {
-            this.created = created;
-        }
-
-        public CachedFile(File file) {
-            super();
-            this.file = file;
-            this.created = System.currentTimeMillis();
-        }
-
-    }
-
-    private static HashMap<String, CachedFile> fileCache = new HashMap<String, CachedFile>();
-    private static Timer cleanupTimer = new Timer("file cache cleanup");
-    static {
-        cleanupTimer.schedule(new TimerTask() {
-
-            @Override
-            public void run() {
-                synchronized (fileCache) {
-
-                    long curTime = System.currentTimeMillis();
-                    Iterator<Entry<String, CachedFile>> iter = fileCache.entrySet().iterator();
-                    int count = 0;
-                    while (iter.hasNext()) {
-                        Entry<String, CachedFile> entry = iter.next();
-                        CachedFile cachedFile = entry.getValue();
-                        if (curTime - cachedFile.getCreated() > CACHECLEANUPPERIOD) {
-                            iter.remove();
-                            count++;
-                        }
-                    }
-                    System.err.println("Cleaned " + count + " file records. " + fileCache.size() + " retained.");
-                }
-            }
-        }, CACHECLEANUPPERIOD, CACHECLEANUPPERIOD);
-    }
-
     public static List<String> fileRecordsToNames(List<FileRecord> fileRecords) {
         List<String> result = new LinkedList<String>();
         for (FileRecord fileRecord : fileRecords) {
             result.add(fileRecord.getName());
         }
         return result;
-    }
-
-    public static FileRecord getFileRecordByFilepath(final Filepath filepath) {
-        return HibernateUtil.exec(new HibernateCallback<FileRecord>() {
-
-            public FileRecord run(Session session) {
-                return getFileRecordByFilepath(filepath, session);
-            }
-        });
-    }
-
-    public static FileRecord getFileRecordByFilepath(final Filepath filepath, Session session) {
-        String name = filepath.getName();
-        try {
-            StringBuilder queryTags = new StringBuilder();
-            queryTags.append("from FileRecord f where f.name = :name and (1=1");
-            boolean negate = false;
-            HashMap<String, Object> tagParams = new HashMap<String, Object>();
-            int tagIndex = 0;
-            for (String tag : filepath.getPath()) {
-                if (tag.equals(CONCATTAGS)) {
-                    queryTags.append(" or 1=1");
-                } else if (tag.equals(EXCLUDETAGS)) {
-                    negate = true;
-                } else {
-                    queryTags.append(" and :t").append(tagIndex).append(" ").append(negate ? "not " : "")
-                            .append("in (select t.name from Tag t where t in elements(f.tags))");
-                    tagParams.put("t" + tagIndex, tag);
-                    tagIndex++;
-                    negate = false;
-                }
-            }
-            queryTags.append(")");
-            int index = name.indexOf(IDSEPARATOR);
-            if (index > 0) {
-                try {
-                    Long id = Long.valueOf(name.substring(0, index));
-                    queryTags.append(" and f.id = ").append(id);
-                } catch (NumberFormatException e) {
-                    throw new FSHandlerFileException("File with name " + name
-                            + " not found in DB and contains invalid ID before separator.");
-                }
-            }
-            FileRecord fileRecord = (FileRecord) session.createQuery(queryTags.toString())
-                    .setString("name", filepath.getStrippedFilename()).setProperties(tagParams).uniqueResult();
-            if (fileRecord != null) {
-                return fileRecord;
-            } else {
-                throw new FSHandlerFileException("File with name " + name + " not found in DB.");
-            }
-        } catch (NonUniqueResultException e) {
-            throw new FSHandlerFileException("Duplicate files found with name " + name);
-        }
-    }
-
-    public static List<String> getTags(final String[] exclude) {
-        return getTags(exclude, true);
-    }
-
-    public static List<String> getTags(final String[] exclude, final boolean strict) {
-        return HibernateUtil.exec(new HibernateCallback<List<String>>() {
-
-            @SuppressWarnings("unchecked")
-            public List<String> run(Session session) {
-                LinkedList<String> result = new LinkedList<String>();
-                List<Tag> tags;
-                HashMap<String, Object> params = new HashMap<String, Object>();
-                String query = "select t from Tag t left join t.parent p where 1=1";
-                if (exclude != null && exclude.length > 0) {
-                    query += " and t.name not in (:exc)";
-                    params.put("exc", exclude);
-                }
-                if (strict) {
-                    if (exclude.length > 0) {
-                        query += " and t.parent.name = :p";
-                        params.put("p", exclude[exclude.length - 1]);
-                    } else {
-                        query += " and t.parent is null";
-                    }
-                } else {
-                    query += " and ((t.parent is not null and p.name in (:p)) or t.parent is null)";
-                    params.put("p", exclude);
-                }
-                tags = session.createQuery(query).setProperties(params).list();
-                for (Tag tag : tags) {
-                    result.add(tag.getName());
-                }
-                return result;
-            }
-        });
-    }
-
-    public static List<String> listFiles(final Filepath filepath) {
-        return HibernateUtil.exec(new HibernateCallback<List<String>>() {
-
-            public List<String> run(Session session) {
-                StringBuilder where = new StringBuilder();
-                int n = 0;
-                HashMap<String, Object> params = new HashMap<String, Object>();
-                boolean negate = false;
-                for (String tag : filepath.getPath()) {
-                    if (tag.equals(CONCATTAGS)) {
-                        where.append(" or 1=1");
-                    } else if (tag.equals(EXCLUDETAGS)) {
-                        negate = true;
-                    } else {
-                        Tag tagEntity = (Tag) session.createQuery("from Tag t where t.name = :tag").setString("tag", tag).uniqueResult();
-                        if (tagEntity != null) {
-                            where.append(" and :tag" + n + (negate ? " not" : "") + " in elements(f.tags)");
-                            negate = false;
-                            params.put("tag" + n, tagEntity);
-                        }
-                        n++;
-                    }
-                }
-                @SuppressWarnings("unchecked")
-                List<FileRecord> fileRecords = session
-                        .createQuery("select f from FileRecord f where 1=1" + where.toString() + " order by f.name").setProperties(params)
-                        .list();
-                // if we're in @@ directory, every file will have an id and tags anyway
-                if (fileRecords.size() > 1 && !filepath.isContentWithTags()) {
-                    FileRecord curRec = fileRecords.get(0);
-                    boolean doRename = false;
-                    boolean equal = false;
-                    for (FileRecord fileRecord : fileRecords.subList(1, fileRecords.size())) {
-                        equal = curRec.getName().equals(fileRecord.getName());
-                        if (equal || doRename) {
-                            session.evict(curRec);
-                            curRec.setName(curRec.getId() + IDSEPARATOR + curRec.getName());
-                        }
-                        doRename = equal;
-                        curRec = fileRecord;
-                    }
-                    if (doRename) {
-                        session.evict(curRec);
-                        curRec.setName(curRec.getId() + IDSEPARATOR + curRec.getName());
-                    }
-                }
-                List<String> result = new LinkedList<String>();
-                if (filepath.isContentWithTags()) {
-                    StringBuilder strRecord = new StringBuilder();
-                    for (FileRecord fileRecord : fileRecords) {
-                        strRecord.append(fileRecord.getId()).append(IDSEPARATOR);
-                        for (Tag tag : fileRecord.getTags()) {
-                            strRecord.append(tag.getName()).append(IDSEPARATOR);
-                        }
-                        strRecord.append(fileRecord.getName());
-                        result.add(strRecord.toString());
-                        strRecord.setLength(0);
-                    }
-                } else {
-                    for (FileRecord fileRecord : fileRecords) {
-                        result.add(fileRecord.getName());
-                    }
-                }
-                return result;
-            }
-        });
-    }
-
-    public static File openFileByFilepath(Filepath filepath) {
-        String strPath = filepath.asStringPath();
-        synchronized (fileCache) {
-            CachedFile cachedFile = fileCache.get(strPath);
-            if (cachedFile == null) {
-                FileRecord fileRecord = getFileRecordByFilepath(filepath);
-                cachedFile = new CachedFile(openFileByNameId(fileRecord.getName(), fileRecord.getId()));
-                fileCache.put(strPath, cachedFile);
-            } else {
-                cachedFile.setCreated(System.currentTimeMillis());
-            }
-            return cachedFile.getFile();
-        }
-    }
-
-    public static void renameTag(final Filepath from, final Filepath to, Session session) {
-        String fromTagName = from.getPathLast();
-        String toTagName = to.getPathLast();
-        Tag fromTag = FSHandlerManager.getTagByName(fromTagName, session);
-        fromTag.setName(toTagName);
-        if (to.getPathLength() > 1) {
-            String toParentTagName = to.getPath()[to.getPathLength() - 2];
-            Tag parentTag = FSHandlerManager.getTagByName(toParentTagName, session);
-            fromTag.setParent(parentTag);
-        } else {
-            fromTag.setParent(null);
-        }
-    }
-
-    public static void removeFileFromCache(Filepath filepath) {
-        synchronized (fileCache) {
-            fileCache.remove(filepath.asStringPath());
-        }
-    }
-
-    public static File openFileByNameId(String name, Long id) {
-        return new File(STORAGE + File.separator + id % 1000 + File.separator + id + IDSEPARATOR + name);
     }
 
     RootHandler rootHandler = new RootHandler();
@@ -332,40 +75,6 @@ public class FSHandlerManager {
         }
     }
 
-    public static void addTagForFilepath(Filepath filepath) throws FSHandlerException {
-        List<String> tags = Arrays.asList(filepath.getPath());
-        if (tags.size() == 0 || tags.contains(ENDOFTAGS)) {
-            throw new FSHandlerException("invaliddir");
-        }
-        if (filepath.getPathLength() > 1) {
-            addTag(filepath.getPathLast(), filepath.getPath()[filepath.getPathLength() - 2]);
-        } else {
-            addTag(filepath.getPathLast());
-        }
-    }
-
-    public static void addTag(final String newTag) {
-        addTag(newTag, null);
-    }
-
-    public static void addTag(final String newTag, final String parent) {
-        HibernateUtil.exec(new HibernateCallback<Void>() {
-
-            public Void run(Session session) {
-                Tag tag = getTagByName(newTag, session);
-                if (tag == null) {
-                    tag = new Tag(newTag);
-                    if (parent != null) {
-                        Tag parentTag = getTagByName(parent, session);
-                        tag.setParent(parentTag);
-                    }
-                    session.save(tag);
-                }
-                return null;
-            }
-        });
-    }
-
     public boolean containsByName(List<FileRecord> fileRecords, String name) {
         for (FileRecord fileRecord : fileRecords) {
             if (fileRecord.getName().equals(name)) {
@@ -373,25 +82,6 @@ public class FSHandlerManager {
             }
         }
         return false;
-    }
-
-    public int deleteTag(final String delTag) {
-        try {
-            HibernateUtil.exec(new HibernateCallback<Void>() {
-
-                public Void run(Session session) {
-                    Tag tag = getTagByName(delTag, session);
-                    if (tag == null) {
-                        throw new RuntimeException();
-                    }
-                    session.delete(tag);
-                    return null;
-                }
-            });
-        } catch (RuntimeException e) {
-            return -ErrorCodes.ENOENT();
-        }
-        return 0;
     }
 
     public void getattr(String path, StatWrapper stat) throws FSHandlerException {
@@ -416,16 +106,6 @@ public class FSHandlerManager {
             throw new FSHandlerException("Handler not found.");
         }
         return result;
-    }
-
-    public static List<Tag> getTagsEntries(final Filepath filepath) {
-        return HibernateUtil.exec(new HibernateCallback<List<Tag>>() {
-
-            @SuppressWarnings("unchecked")
-            public List<Tag> run(Session session) {
-                return session.createQuery("from Tag t where t.name in (:tags)").setParameterList("tags", filepath.getPath()).list();
-            }
-        });
     }
 
     public boolean isContent(String[] pathTags) {
@@ -504,10 +184,6 @@ public class FSHandlerManager {
         }
     }
 
-    public static Tag getTagByName(String tagName, Session session) {
-        return (Tag) session.createQuery("from Tag t where t.name = :tag").setString("tag", tagName).uniqueResult();
-    }
-
     public void unlink(String path) throws FSHandlerException {
         Filepath filepath = parseFilePath(path);
         FSHandler handler = getHandlerByPath(filepath);
@@ -546,11 +222,6 @@ public class FSHandlerManager {
         Filepath filepath = parseFilePath(path);
         FSHandler handler = getHandlerByPath(filepath);
         handler.release(strip(filepath, handler), info);
-    }
-
-    public static void stopTimers() {
-        cleanupTimer.cancel();
-        HibernateUtil.cleanup();
     }
 
     public void rmdir(String path) throws FSHandlerException {

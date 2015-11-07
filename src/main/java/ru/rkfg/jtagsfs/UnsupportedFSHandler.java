@@ -68,4 +68,9 @@ public abstract class UnsupportedFSHandler implements FSHandler {
     public void rmdir(Filepath strip) throws FSHandlerException {
         throw new FSHandlerException("notsupp");
     }
+
+    @Override
+    public void cleanup() {
+
+    }
 }
