@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +35,7 @@ public class TagsHandler extends AbstractTagsHandler {
 
     // this permanent session is only used for tags enumeration purposes, it won't be closed/reopened for performance reasons
     private Session getattrSession = HibernateUtil.getSession();
+    private Charset charset = Charset.forName("utf-8");
 
     private File openFileByNameId(String name, Long id) {
         return new File(STORAGE + File.separator + id % 1000 + File.separator + id + IDSEPARATOR + name);
@@ -77,7 +79,7 @@ public class TagsHandler extends AbstractTagsHandler {
         String name = filepath.getName();
         try {
             StringBuilder queryTags = new StringBuilder();
-            queryTags.append("from FileRecord f where f.name = :name and (1=1");
+            queryTags.append("from FileRecord f left join fetch f.tags where f.name = :name and (1=1");
             boolean negate = false;
             HashMap<String, Object> tagParams = new HashMap<String, Object>();
             int tagIndex = 0;
@@ -226,13 +228,18 @@ public class TagsHandler extends AbstractTagsHandler {
             stat.mode(VirtualEntry.DIRMODE);
             stat.size(4096);
         } else {
-            try {
-                File file = openFileByFilepath(filepath);
-                stat.size(file.length());
-                stat.mode(VirtualEntry.FILEMODE);
-                stat.setAllTimesMillis(file.lastModified());
-            } catch (FSHandlerFileException e) {
-                throw new FSHandlerException("notfound");
+            stat.mode(VirtualEntry.FILEMODE);
+            if (filepath.isTagsListPath()) {
+                stat.size(65536); // ought to be enough for anybody™
+                stat.setAllTimesMillis(System.currentTimeMillis());
+            } else {
+                try {
+                    File file = openFileByFilepath(filepath);
+                    stat.size(file.length());
+                    stat.setAllTimesMillis(file.lastModified());
+                } catch (FSHandlerFileException e) {
+                    throw new FSHandlerException("notfound");
+                }
             }
         }
     }
@@ -259,6 +266,9 @@ public class TagsHandler extends AbstractTagsHandler {
 
     @Override
     public void open(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
+        if (filepath.isTagsListPath()) {
+            return;
+        }
         synchronized (cacheManager) {
             String strPath = filepath.asStringPath();
             LockableFile lockable = cacheManager.getStreamFile(strPath);
@@ -280,6 +290,16 @@ public class TagsHandler extends AbstractTagsHandler {
 
     @Override
     public int read(Filepath filepath, ByteBuffer buffer, long size, long offset) throws FSHandlerException {
+        if (filepath.isTagsListPath()) {
+            int result = 0;
+            filepath.removeTagslistExt();
+            for (Tag tag : getFileRecordByFilepath(filepath).getTags()) {
+                byte[] tagName = tag.getName().getBytes(charset);
+                buffer.put(tagName).put((byte) '\n');
+                result += tagName.length + 1;
+            }
+            return result;
+        }
         try {
             String strPath = filepath.asStringPath();
             LockableFile lockableStream = cacheManager.getStreamFile(strPath);

@@ -138,4 +138,14 @@ public class Filepath implements Cloneable {
         });
     }
 
+    public boolean isTagsListPath() {
+        return name.endsWith(Consts.TAGSLIST_EXT);
+    }
+
+    public void removeTagslistExt() {
+        if (isTagsListPath()) {
+            name = name.substring(0, name.length() - Consts.TAGSLIST_EXT.length());
+        }
+    }
+
 }
