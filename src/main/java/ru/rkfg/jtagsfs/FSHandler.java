@@ -37,5 +37,4 @@ public interface FSHandler {
 
     public void rmdir(Filepath strip) throws FSHandlerException;
 
-    public void cleanup();
 }

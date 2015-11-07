@@ -4,6 +4,12 @@ import static ru.rkfg.jtagsfs.Consts.*;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.hibernate.Session;
+
+import ru.rkfg.jtagsfs.domain.Tag;
 
 public class Filepath implements Cloneable {
     boolean content;
@@ -120,4 +126,16 @@ public class Filepath implements Cloneable {
         }
         return name;
     }
+
+    public Set<Tag> getTagsEntries() {
+        return HibernateUtil.exec(new HibernateCallback<Set<Tag>>() {
+
+            @SuppressWarnings("unchecked")
+            public Set<Tag> run(Session session) {
+                return new HashSet<Tag>(session.createQuery("from Tag t where t.name in (:tags)").setParameterList("tags", getPath())
+                        .list());
+            }
+        });
+    }
+
 }

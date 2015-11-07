@@ -157,9 +157,7 @@ public class JTagsFS extends FuseFilesystemAdapterFull {
     @Override
     public void afterUnmount(File mountPoint) {
         super.afterUnmount(mountPoint);
-        for (FSHandler handler : manager.handlers) {
-            handler.cleanup();
-        }
+        CacheManager.INSTANCE.cleanup();
         HibernateUtil.cleanup();
     }
 

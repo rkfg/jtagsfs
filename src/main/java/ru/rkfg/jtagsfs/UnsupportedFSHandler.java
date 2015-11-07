@@ -69,8 +69,4 @@ public abstract class UnsupportedFSHandler implements FSHandler {
         throw new FSHandlerException("notsupp");
     }
 
-    @Override
-    public void cleanup() {
-
-    }
 }

@@ -11,12 +11,8 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Timer;
-import java.util.TimerTask;
 
 import net.fusejna.StructFuseFileInfo.FileInfoWrapper;
 import net.fusejna.StructStat.StatWrapper;
@@ -31,62 +27,9 @@ import ru.rkfg.jtagsfs.domain.Tag;
 
 public class TagsHandler extends AbstractTagsHandler {
 
-    private class LockableFile {
-        int lockCount;
-        RandomAccessFile stream;
-
-        public LockableFile(RandomAccessFile stream) {
-            this.stream = stream;
-            lockCount = 1;
-        }
-
-        public RandomAccessFile getFile() {
-            return stream;
-        }
-
-        public int lock() {
-            return ++lockCount;
-        }
-
-        public int release() {
-            return --lockCount;
-        }
-
-    }
-
-    private HashMap<String, CachedFile> fileCache = new HashMap<String, CachedFile>();
-    private HashMap<String, LockableFile> fileStreamCache = new HashMap<String, LockableFile>();
-
-    private Timer cleanupTimer = new Timer("file cache cleanup");
+    CacheManager cacheManager = CacheManager.INSTANCE;
 
     public TagsHandler() {
-        cleanupTimer.schedule(new TimerTask() {
-
-            @Override
-            public void run() {
-                synchronized (fileCache) {
-
-                    long curTime = System.currentTimeMillis();
-                    Iterator<Entry<String, CachedFile>> iter = fileCache.entrySet().iterator();
-                    int count = 0;
-                    while (iter.hasNext()) {
-                        Entry<String, CachedFile> entry = iter.next();
-                        CachedFile cachedFile = entry.getValue();
-                        if (curTime - cachedFile.getCreated() > CACHECLEANUPPERIOD) {
-                            iter.remove();
-                            count++;
-                        }
-                    }
-                    System.err.println("Cleaned " + count + " file records. " + fileStreamCache.size() + " retained.");
-                }
-            }
-        }, CACHECLEANUPPERIOD, CACHECLEANUPPERIOD);
-    }
-
-    private void removeFileFromCache(Filepath filepath) {
-        synchronized (fileCache) {
-            fileCache.remove(filepath.asStringPath());
-        }
     }
 
     // this permanent session is only used for tags enumeration purposes, it won't be closed/reopened for performance reasons
@@ -98,12 +41,22 @@ public class TagsHandler extends AbstractTagsHandler {
 
     private File openFileByFilepath(Filepath filepath) {
         String strPath = filepath.asStringPath();
-        synchronized (fileCache) {
-            CachedFile cachedFile = fileCache.get(strPath);
+        // make the entire operation atomic
+        synchronized (cacheManager) {
+            CachedFile cachedFile = cacheManager.getCachedFile(strPath);
+            if (cacheManager.isNonExistentFile(strPath)) {
+                throw new FSHandlerFileException("cached nonexistent");
+            }
             if (cachedFile == null) {
-                FileRecord fileRecord = getFileRecordByFilepath(filepath);
+                FileRecord fileRecord = null;
+                try {
+                    fileRecord = getFileRecordByFilepath(filepath);
+                } catch (FSHandlerFileException e) {
+                    cacheManager.putNonExistentFile(strPath);
+                    throw e;
+                }
                 cachedFile = new CachedFile(openFileByNameId(fileRecord.getName(), fileRecord.getId()));
-                fileCache.put(strPath, cachedFile);
+                cacheManager.putCachedFile(strPath, cachedFile);
             } else {
                 cachedFile.setCreated(System.currentTimeMillis());
             }
@@ -232,16 +185,6 @@ public class TagsHandler extends AbstractTagsHandler {
         });
     }
 
-    private List<Tag> getTagsEntries(final Filepath filepath) {
-        return HibernateUtil.exec(new HibernateCallback<List<Tag>>() {
-
-            @SuppressWarnings("unchecked")
-            public List<Tag> run(Session session) {
-                return session.createQuery("from Tag t where t.name in (:tags)").setParameterList("tags", filepath.getPath()).list();
-            }
-        });
-    }
-
     @Override
     public void create(final Filepath filepath, final FileInfoWrapper info) throws FSHandlerException {
         if (!filepath.getStrippedFilename().equals(filepath.getName())) {
@@ -250,8 +193,9 @@ public class TagsHandler extends AbstractTagsHandler {
         HibernateUtil.exec(new HibernateCallback<Void>() {
 
             public Void run(Session session) {
-                FileRecord fileRecord = new FileRecord(filepath.getStrippedFilename(), new HashSet<Tag>(getTagsEntries(filepath)));
+                FileRecord fileRecord = new FileRecord(filepath.getStrippedFilename(), new HashSet<Tag>(filepath.getTagsEntries()));
                 session.save(fileRecord);
+                cacheManager.removeNonExistentFile(filepath.asStringPath());
                 return null;
             }
         });
@@ -315,9 +259,9 @@ public class TagsHandler extends AbstractTagsHandler {
 
     @Override
     public void open(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
-        synchronized (fileStreamCache) {
+        synchronized (cacheManager) {
             String strPath = filepath.asStringPath();
-            LockableFile lockable = fileStreamCache.get(strPath);
+            LockableFile lockable = cacheManager.getStreamFile(strPath);
             if (lockable != null) {
                 lockable.lock();
             } else {
@@ -326,7 +270,7 @@ public class TagsHandler extends AbstractTagsHandler {
                     file.getParentFile().mkdirs();
                     file.createNewFile();
                     RandomAccessFile raFile = new RandomAccessFile(file, "rw");
-                    fileStreamCache.put(strPath, new LockableFile(raFile));
+                    cacheManager.putStreamFile(strPath, new LockableFile(raFile));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -338,10 +282,7 @@ public class TagsHandler extends AbstractTagsHandler {
     public int read(Filepath filepath, ByteBuffer buffer, long size, long offset) throws FSHandlerException {
         try {
             String strPath = filepath.asStringPath();
-            LockableFile lockableStream;
-            synchronized (fileStreamCache) {
-                lockableStream = fileStreamCache.get(strPath);
-            }
+            LockableFile lockableStream = cacheManager.getStreamFile(strPath);
             if (lockableStream == null) {
                 throw new FSHandlerException("notopened");
             }
@@ -386,9 +327,9 @@ public class TagsHandler extends AbstractTagsHandler {
 
     @Override
     public void release(Filepath filepath, FileInfoWrapper info) throws FSHandlerException {
-        synchronized (fileStreamCache) {
+        synchronized (cacheManager) {
             String strPath = filepath.asStringPath();
-            LockableFile lockableFile = fileStreamCache.get(strPath);
+            LockableFile lockableFile = cacheManager.getStreamFile(strPath);
             if (lockableFile == null) {
                 throw new FSHandlerException("notopened");
             }
@@ -398,7 +339,7 @@ public class TagsHandler extends AbstractTagsHandler {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                fileStreamCache.remove(strPath);
+                cacheManager.removeStreamFile(strPath);
             }
         }
     }
@@ -417,7 +358,7 @@ public class TagsHandler extends AbstractTagsHandler {
                 }
                 FileRecord fileRecord = getFileRecordByFilepath(from, session);
                 fileRecord.getTags().clear();
-                fileRecord.getTags().addAll(getTagsEntries(to));
+                fileRecord.getTags().addAll(to.getTagsEntries());
                 String toName = to.getStrippedFilename();
                 if (!fileRecord.getName().equals(toName)) {
                     try {
@@ -432,8 +373,10 @@ public class TagsHandler extends AbstractTagsHandler {
                     openFileByFilepath(from).renameTo(openFileByNameId(toName, fileRecord.getId()));
                 }
                 fileRecord.setName(toName);
-                removeFileFromCache(from);
-                removeFileFromCache(to);
+                synchronized (cacheManager) {
+                    cacheManager.removeCachedFile(from);
+                    cacheManager.removeCachedFile(to);
+                }
                 return null;
             }
         });
@@ -464,7 +407,7 @@ public class TagsHandler extends AbstractTagsHandler {
             public Void run(Session session) {
                 openFileByFilepath(filepath).delete();
                 session.delete(getFileRecordByFilepath(filepath, session));
-                removeFileFromCache(filepath);
+                cacheManager.removeCachedFile(filepath);
                 return null;
             }
         });
@@ -475,10 +418,7 @@ public class TagsHandler extends AbstractTagsHandler {
     public int write(Filepath filepath, ByteBuffer buffer, long bufSize, long writeOffset) throws FSHandlerException {
         try {
             String strPath = filepath.asStringPath();
-            LockableFile lockable;
-            synchronized (fileStreamCache) {
-                lockable = fileStreamCache.get(strPath);
-            }
+            LockableFile lockable = cacheManager.getStreamFile(strPath);
             if (lockable == null) {
                 throw new FSHandlerException("notopened");
             }
@@ -495,10 +435,5 @@ public class TagsHandler extends AbstractTagsHandler {
             e.printStackTrace();
             throw new FSHandlerException("err: " + e.getMessage());
         }
-    }
-
-    @Override
-    public void cleanup() {
-        cleanupTimer.cancel();
     }
 }
