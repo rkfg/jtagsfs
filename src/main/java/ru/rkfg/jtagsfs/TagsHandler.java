@@ -396,6 +396,8 @@ public class TagsHandler extends AbstractTagsHandler {
                 synchronized (cacheManager) {
                     cacheManager.removeCachedFile(from);
                     cacheManager.removeCachedFile(to);
+                    cacheManager.removeNonExistentFile(from.asStringPath());
+                    cacheManager.removeNonExistentFile(to.asStringPath());
                 }
                 return null;
             }
