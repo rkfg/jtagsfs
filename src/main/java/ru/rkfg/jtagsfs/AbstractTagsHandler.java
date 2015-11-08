@@ -4,8 +4,9 @@ import static ru.rkfg.jtagsfs.Consts.*;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import net.fusejna.ErrorCodes;
 
@@ -73,19 +74,19 @@ public abstract class AbstractTagsHandler extends UnsupportedFSHandler {
         return (Tag) session.createQuery("from Tag t where t.name = :tag").setString("tag", tagName).uniqueResult();
     }
 
-    protected List<String> getTags(final String[] exclude) {
+    protected Set<String> getTags(final String[] exclude) {
         return getTags(exclude, true);
     }
 
-    protected List<String> getTags(final String[] exclude, final boolean strict) {
-        return HibernateUtil.exec(new HibernateCallback<List<String>>() {
+    protected Set<String> getTags(final String[] exclude, final boolean strict) {
+        return HibernateUtil.exec(new HibernateCallback<Set<String>>() {
 
             @SuppressWarnings("unchecked")
-            public List<String> run(Session session) {
-                LinkedList<String> result = new LinkedList<String>();
+            public Set<String> run(Session session) {
+                Set<String> result = new HashSet<String>();
                 List<Tag> tags;
                 HashMap<String, Object> params = new HashMap<String, Object>();
-                String query = "select t from Tag t left join t.parent p where 1=1";
+                String query = "select t from Tag t left join fetch t.parent p where 1=1";
                 if (exclude != null && exclude.length > 0) {
                     query += " and t.name not in (:exc)";
                     params.put("exc", exclude);

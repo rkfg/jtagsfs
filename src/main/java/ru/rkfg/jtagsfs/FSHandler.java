@@ -1,7 +1,7 @@
 package ru.rkfg.jtagsfs;
 
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.Set;
 
 import net.fusejna.StructFuseFileInfo.FileInfoWrapper;
 import net.fusejna.StructStat.StatWrapper;
@@ -11,7 +11,7 @@ public interface FSHandler {
 
     public String getPrefix();
 
-    public List<String> readdir(Filepath filepath) throws FSHandlerException;
+    public Set<String> readdir(Filepath filepath) throws FSHandlerException;
 
     public void getattr(Filepath filepath, StatWrapper stat) throws FSHandlerException;
 

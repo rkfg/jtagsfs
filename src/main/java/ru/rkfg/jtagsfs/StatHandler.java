@@ -1,6 +1,6 @@
 package ru.rkfg.jtagsfs;
 
-import java.util.List;
+import java.util.Set;
 
 import net.fusejna.StructStat.StatWrapper;
 import ru.rkfg.jtagsfs.FSHandlerManager.FSHandlerException;
@@ -22,7 +22,7 @@ public class StatHandler extends UnsupportedFSHandler {
     }
 
     @Override
-    public List<String> readdir(Filepath filepath) {
+    public Set<String> readdir(Filepath filepath) {
         return virtualDirectory.list();
     }
 

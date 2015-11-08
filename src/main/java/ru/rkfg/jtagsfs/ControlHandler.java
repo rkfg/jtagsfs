@@ -1,7 +1,7 @@
 package ru.rkfg.jtagsfs;
 
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.Set;
 
 import net.fusejna.StructStat.StatWrapper;
 
@@ -18,7 +18,7 @@ public class ControlHandler extends AbstractTagsHandler {
     }
 
     @Override
-    public List<String> readdir(Filepath filepath) {
+    public Set<String> readdir(Filepath filepath) {
         return getTags(filepath.getPath(), true);
     }
 

@@ -12,8 +12,8 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import net.fusejna.StructFuseFileInfo.FileInfoWrapper;
 import net.fusejna.StructStat.StatWrapper;
@@ -119,10 +119,10 @@ public class TagsHandler extends AbstractTagsHandler {
         }
     }
 
-    private List<String> listFiles(final Filepath filepath) {
-        return HibernateUtil.exec(new HibernateCallback<List<String>>() {
+    private Set<String> listFiles(final Filepath filepath) {
+        return HibernateUtil.exec(new HibernateCallback<Set<String>>() {
 
-            public List<String> run(Session session) {
+            public Set<String> run(Session session) {
                 StringBuilder where = new StringBuilder();
                 int n = 0;
                 HashMap<String, Object> params = new HashMap<String, Object>();
@@ -165,7 +165,7 @@ public class TagsHandler extends AbstractTagsHandler {
                         curRec.setName(curRec.getId() + IDSEPARATOR + curRec.getName());
                     }
                 }
-                List<String> result = new LinkedList<String>();
+                Set<String> result = new HashSet<String>();
                 if (filepath.isContentWithTags()) {
                     StringBuilder strRecord = new StringBuilder();
                     for (FileRecord fileRecord : fileRecords) {
@@ -321,9 +321,9 @@ public class TagsHandler extends AbstractTagsHandler {
     }
 
     @Override
-    public List<String> readdir(Filepath filepath) throws FSHandlerException {
+    public Set<String> readdir(Filepath filepath) throws FSHandlerException {
         if (!filepath.isContent()) {
-            List<String> tags;
+            Set<String> tags;
             if (filepath.getPathLength() == 0 || filepath.getPathLast().equals(Consts.CONCATTAGS)) {
                 tags = getTags(new String[0]);
             } else if (filepath.getPathLast().equals(Consts.EXCLUDETAGS)) {

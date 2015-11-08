@@ -1,7 +1,7 @@
 package ru.rkfg.jtagsfs;
 
 import java.nio.ByteBuffer;
-import java.util.List;
+import java.util.Set;
 
 import net.fusejna.StructFuseFileInfo.FileInfoWrapper;
 import net.fusejna.StructStat.StatWrapper;
@@ -10,7 +10,7 @@ import ru.rkfg.jtagsfs.FSHandlerManager.FSHandlerException;
 public abstract class UnsupportedFSHandler implements FSHandler {
 
     @Override
-    public List<String> readdir(Filepath filepath) throws FSHandlerException {
+    public Set<String> readdir(Filepath filepath) throws FSHandlerException {
         throw new FSHandlerException("notsupp");
     }
 

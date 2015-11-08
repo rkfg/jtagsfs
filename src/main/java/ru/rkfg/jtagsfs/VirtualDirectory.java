@@ -2,8 +2,9 @@ package ru.rkfg.jtagsfs;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class VirtualDirectory {
 
@@ -18,8 +19,8 @@ public class VirtualDirectory {
 
     private List<VirtualEntry> entries = new ArrayList<VirtualEntry>();
 
-    public List<String> list() {
-        List<String> result = new LinkedList<String>();
+    public Set<String> list() {
+        Set<String> result = new HashSet<String>();
         for (VirtualEntry entry : entries) {
             result.add(entry.getName());
         }
